@@ -122,8 +122,34 @@ class TransferEngine:
 
             # 检查目标目录是否已有该集数的文件（按集数匹配）
             if ep in dest_episodes:
-                log.info(f"  跳过 E{ep:02d}: 目标已有同集数文件 {dest_episodes[ep]['name']}")
-                continue
+                existing_dest = dest_episodes[ep]
+                existing_size = existing_dest.get("size", 0)
+                new_size = sf.get("size", 0)
+
+                # 判断是否不同版本（如 V2 vs V1）
+                is_diff_version = self._is_better_version(share_file_name, existing_dest["name"]) or \
+                                  self._is_better_version(existing_dest["name"], share_file_name)
+
+                if is_diff_version:
+                    # 不同版本（如 V2 vs V1），不替换
+                    log.info(f"  跳过 E{ep:02d}: 目标已有同集数文件 {existing_dest['name']}（不同版本）")
+                    continue
+                elif new_size > existing_size:
+                    # 同版本但文件更大（画质更好），替换
+                    log.info(f"  🔄 E{ep:02d}: 同版本更大文件 {share_file_name}（{new_size//1024//1024}MB > {existing_size//1024//1024}MB），替换 {existing_dest['name']}")
+                    try:
+                        self.api.delete_file(existing_dest["file_id"])
+                        log.info(f"  🗑️ 已删除: {existing_dest['name']}")
+                        dest_files.pop(existing_dest["name"], None)
+                        time.sleep(1)
+                    except Exception as e:
+                        log.warning(f"  ⚠️ 删除失败: {e}")
+                        continue
+                    del dest_episodes[ep]
+                else:
+                    # 同版本且文件更大或相等，跳过
+                    log.info(f"  跳过 E{ep:02d}: 目标已有同集数文件 {existing_dest['name']}（文件更大或相等）")
+                    continue
 
             # 同批同集数去重：优先保留 V2 版本，其次保留无括号后缀的
             if ep in batch_episodes:
