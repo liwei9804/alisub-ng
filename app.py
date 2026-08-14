@@ -77,14 +77,10 @@ scheduler = None
 def get_api():
     global api
     if api is None:
-        token = REFRESH_TOKEN
-        try:
-            s = load_settings()
-            if s.get("token"):
-                token = s["token"]
-        except:
-            pass
-        api = AliyunDriveAPI(token, DRIVE_ID)
+        s = load_settings()
+        token = s.get("token", REFRESH_TOKEN)
+        drive_id = s.get("drive_id", DRIVE_ID)
+        api = AliyunDriveAPI(token, drive_id)
     return api
 
 
@@ -518,7 +514,7 @@ def api_drives():
         except:
             pass
         # 资源盘（默认 drive_name=resource）
-        resource_drive_id = current.get("drive_id", "")
+        resource_drive_id = s.get("drive_id", "")
         if resource_drive_id != default_drive_id:
             try:
                 r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": resource_drive_id}, headers=headers, timeout=15)
