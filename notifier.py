@@ -2,6 +2,8 @@
 """
 通知系统 - 企业微信 Webhook
 """
+import json
+import time
 
 import logging
 import requests
@@ -94,18 +96,25 @@ class Notifier:
                 log.error(f"❌ SmartStrm [{task_name}] 请求异常: {e}")
 
     def refresh_openlist(self, storage_id: int = 0):
-        """刷新 OpenList 存储源缓存"""
+        """刷新 OpenList 存储源（先禁用再启用）"""
         if not self.openlist_url or not self.openlist_token or not storage_id:
             return
         base = self.openlist_url.rstrip("/")
         headers = {"Authorization": self.openlist_token}
         try:
-            url = base + "/api/admin/storage/refresh"
-            resp = requests.post(url, json={"id": storage_id}, headers=headers, timeout=15)
-            data = resp.json()
-            if data.get("code") == 200:
+            # 禁用
+            r1 = requests.post(f"{base}/api/admin/storage/disable?id={storage_id}", headers=headers, timeout=15)
+            d1 = r1.json()
+            if d1.get("code") != 200:
+                log.warning(f"⚠️ OpenList 存储源 #{storage_id} 禁用失败: {d1.get('message','')}")
+                return
+            time.sleep(1)
+            # 启用
+            r2 = requests.post(f"{base}/api/admin/storage/enable?id={storage_id}", headers=headers, timeout=15)
+            d2 = r2.json()
+            if d2.get("code") == 200:
                 log.info(f"📂 OpenList 存储源 #{storage_id} 刷新成功")
             else:
-                log.warning(f"⚠️ OpenList 存储源刷新失败: {data.get('message', '')}")
+                log.warning(f"⚠️ OpenList 存储源 #{storage_id} 启用失败: {d2.get('message','')}")
         except Exception as e:
             log.error(f"❌ OpenList 存储源刷新异常: {e}")
