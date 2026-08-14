@@ -161,6 +161,7 @@ class TransferEngine:
                         "share_file_name": share_file_name,
                         "episode": ep,
                         "expected_name": expected_name,
+                        "reason": sf.get("reason", ""),
                     }
                 else:
                     log.info(f"  跳过 E{ep:02d}: {share_file_name}（已有更优版本 {existing['share_file_name']}）")
@@ -171,6 +172,7 @@ class TransferEngine:
                 "share_file_name": share_file_name,
                 "episode": ep,
                 "expected_name": expected_name,
+                "reason": sf.get("reason", ""),
             }
 
         to_transfer = list(batch_episodes.values())
