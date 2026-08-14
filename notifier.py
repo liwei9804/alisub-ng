@@ -51,7 +51,11 @@ class Notifier:
             f" 📋文件：",
         ]
         for i, t in enumerate(transfers, 1):
-            lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}")
+            reason = t.get("reason")
+            if reason:
+                lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}（{reason}）")
+            else:
+                lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}")
         lines.append(f" ✅状态: success")
 
         self.send("\n".join(lines))
