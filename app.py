@@ -33,7 +33,7 @@ PORT = int(os.environ.get("PORT", "8003"))
 
 # ─── 云盘设置 ──────────────────────────────────────
 
-SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "data", "settings.json")
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
 
 def load_settings():
@@ -518,7 +518,7 @@ def api_drives():
         except:
             pass
         # 资源盘（默认 drive_name=resource）
-        resource_drive_id = "840490182"
+        resource_drive_id = current.get("drive_id", "")
         if resource_drive_id != default_drive_id:
             try:
                 r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": resource_drive_id}, headers=headers, timeout=15)

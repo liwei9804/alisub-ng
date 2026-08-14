@@ -52,12 +52,9 @@ log = logging.getLogger("alisub-ng")
 # ─── 配置 ──────────────────────────────────────────────
 
 CONFIG = {
-    "refresh_token": os.environ.get("REFRESH_TOKEN", "c39092bdb98348078c20a9c2d3e5e7c0"),
-    "drive_id": os.environ.get("DRIVE_ID", "840490182"),
-    "webhook_url": os.environ.get(
-        "WEBHOOK_URL",
-        "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=a165651e-3cd8-4a9e-9e8d-d4e7a65979be"
-    ),
+    "refresh_token": os.environ.get("REFRESH_TOKEN", ""),
+    "drive_id": os.environ.get("DRIVE_ID", ""),
+    "webhook_url": os.environ.get("WEBHOOK_URL", ""),
     "check_interval": int(os.environ.get("CHECK_INTERVAL", "3600")),  # 默认1小时
     "port": int(os.environ.get("PORT", "8003")),
 }

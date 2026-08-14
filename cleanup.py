@@ -28,8 +28,8 @@ from detector import extract_episode
 
 # ─── 配置 ──────────────────────────────────────────────
 
-REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "c39092bdb98348078c20a9c2d3e5e7c0")
-DRIVE_ID = os.environ.get("DRIVE_ID", "840490182")
+REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "")
+DRIVE_ID = os.environ.get("DRIVE_ID", "")
 
 
 def cleanup_subscription(api: AliyunDriveAPI, sub_name: str,
