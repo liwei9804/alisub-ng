@@ -53,6 +53,11 @@ def extract_episode(filename: str, custom_regex: str = "") -> int:
     # 先去掉扩展名用于匹配
     name = os.path.splitext(filename)[0] if '.' in filename else filename
 
+    # 去掉 .V1 / .V2 等版本标记（避免被误识别为集数）
+    name = re.sub(r'\.V\d+\b', '', name, flags=re.IGNORECASE)
+    # 去掉 (1) / (2) 等重复标记
+    name = re.sub(r'\(\d+\)$', '', name).strip()
+
     # 如果有自定义正则，优先使用
     if custom_regex:
         try:

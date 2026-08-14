@@ -122,7 +122,7 @@ def main():
 
     # 从 alisub 数据库读取订阅列表
     import sqlite3
-    db_path = "/vol1/1000/aliyundrive-subscribe/config/data.db"
+    db_path = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
     if not os.path.exists(db_path):
         log.error(f"alisub 数据库不存在: {db_path}")
         return

@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>alisub-ng</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:20px;font-weight:600}
+.topbar .sub{font-size:12px;opacity:0.8}
+.tabs{display:flex;background:#fff;border-bottom:2px solid #f0f0f0;padding:0 24px}
+.tabs a{padding:12px 20px;text-decoration:none;color:#666;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tabs a:hover{color:#667eea}
+.tabs a.active{color:#667eea;border-bottom-color:#667eea;font-weight:600}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.stat-card .label{font-size:13px;color:#888;margin-bottom:6px}
+.stat-card .value{font-size:28px;font-weight:700}
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px}
+.card-title{font-size:16px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0f0f0;font-size:13px}
+th{background:#fafafa;color:#666;font-weight:600;position:sticky;top:0}
+tr:hover{background:#f9f9ff}
+.btn{padding:6px 16px;border:none;border-radius:6px;font-size:13px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-primary{background:#667eea;color:#fff}
+.btn-primary:hover{background:#5a6fd6}
+.btn-success{background:#52c41a;color:#fff}
+.btn-danger{background:#ff4d4f;color:#fff}
+.btn-danger:hover{background:#e03e3e}
+.btn-outline{background:transparent;border:1px solid #d9d9d9;color:#666}
+.btn-outline:hover{border-color:#667eea;color:#667eea}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:200;justify-content:center;align-items:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;color:#666;margin-bottom:4px;font-weight:500}
+.form-group input{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px}
+.form-group input:focus{outline:none;border-color:#667eea}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:999;transform:translateX(120%);transition:transform .3s}
+.toast.show{transform:translateX(0)}
+.toast-ok{background:#52c41a}
+.toast-err{background:#ff4d4f}
+.empty{text-align:center;padding:40px;color:#aaa}
+.file-list{max-height:500px;overflow-y:auto}
+.file-item{display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .15s}
+.file-item:hover{background:#f0f5ff}
+.file-item .icon{margin-right:10px;font-size:18px}
+.file-item .name{flex:1;font-size:13px}
+.file-item .size{color:#aaa;font-size:12px}
+.breadcrumb{display:flex;gap:4px;margin-bottom:12px;font-size:13px;flex-wrap:wrap}
+.breadcrumb a{color:#667eea;text-decoration:none}
+.breadcrumb span{color:#ccc}
+.tab-content{display:none}
+.tab-content.active{display:block}
+@media(max-width:768px){.container{padding:12px}.grid{grid-template-columns:1fr 1fr}}
+.day-checked{background:#667eea!important;color:#fff!important;border-color:#667eea!important}
+</style>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='68' font-family='Arial,sans-serif' font-size='48' font-weight='bold' fill='white' text-anchor='middle'>AS</text></svg>">
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>📦 alisub-ng</h1>
+    <div class="sub">阿里云盘订阅转存重命名管理系统</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div id="accountInfo" style="font-size:12px;opacity:0.9;display:flex;gap:8px;align-items:center"></div>
+    <a href="/logout" style="color:#fff;text-decoration:none;font-size:13px;opacity:0.8;hover:opacity:1">🚪 退出</a>
+    <div style="font-size:12px;opacity:0.8" id="clock"></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <a href="#" class="active" onclick="switchTab(event,'tab-subs')">📋 订阅管理</a>
+  <a href="#" onclick="switchTab(event,'tab-browser')">📂 文件浏览</a>
+  <a href="#" onclick="switchTab(event,'tab-cleanup')">🗑️ 去重清理</a>
+  <a href="#" onclick="switchTab(event,'tab-settings')">⚙️ 云盘设置</a>
+</div>
+
+<div class="container">
+  <!-- 订阅管理 -->
+  <div id="tab-subs" class="tab-content active">
+    <div class="grid" id="statsGrid"></div>
+    <div class="card">
+      <div class="card-title">📋 订阅列表
+        <select id="subStatusFilter" onchange="filterSubs()" style="padding:4px 8px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px">
+          <option value="all">全部</option>
+          <option value="1">订阅中</option>
+          <option value="2">暂停</option>
+          <option value="4">完结</option>
+          <option value="3">失效</option>
+        </select>
+        <span id="subCount" style="font-size:12px;color:#aaa"></span>
+        <button class="btn btn-primary btn-sm" onclick="refreshSubs()" style="margin-left:auto">🔍 检查所有</button>
+        <button class="btn btn-success btn-sm" onclick="openAddSub()">➕ 新增订阅</button>
+        <button class="btn btn-outline btn-sm" onclick="showLogs()">📋 订阅日志</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>名称</th><th>状态</th><th>检查星期</th><th>命名模板</th><th>最后文件</th><th>重命名预览</th><th>转存数</th><th>操作</th></tr>
+          </thead>
+          <tbody id="subsBody"><tr><td colspan="9" class="empty">加载中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 文件浏览器 -->
+  <div id="tab-browser" class="tab-content">
+    <div class="card">
+      <div class="card-title">📂 阿里云盘文件浏览器</div>
+      <div class="breadcrumb" id="breadcrumb"><a href="#" onclick="browseFiles('root')">根目录</a></div>
+      <div class="file-list" id="fileList"><div class="empty">点击加载...</div></div>
+    </div>
+  </div>
+
+  <!-- 去重清理 -->
+  <div id="tab-cleanup" class="tab-content">
+    <div class="card">
+      <div class="card-title">🗑️ 去重清理 <button class="btn btn-primary btn-sm" onclick="dryRunCleanup()" style="margin-left:auto">🔍 扫描</button></div>
+      <div id="cleanupResult"><div class="empty">点击"扫描"检查重复文件</div></div>
+    </div>
+  </div>
+
+  <!-- 云盘设置 -->
+  <div id="tab-settings" class="tab-content">
+    <div class="card">
+      <div class="card-title">⚙️ 云盘设置</div>
+      <div class="form-group"><label>🔑 Refresh Token</label><input type="text" id="cfgToken" placeholder="阿里云盘 refresh_token"></div>
+      <div class="form-group"><label>💾 Drive ID</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="cfgDriveId" style="flex:1;padding:8px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px">
+            <option value="">请先填写 Token 并测试连接</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadDrives()">🔄 刷新</button>
+        </div>
+        <div id="driveInfo" style="font-size:12px;color:#999;margin-top:4px"></div>
+      </div>
+      <div class="form-group"><label>🔔 企业微信 Webhook</label><input type="text" id="cfgWebhook" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"></div>
+      <div class="form-group"><label>⏱️ 检查间隔（秒）</label><input type="number" id="cfgInterval" placeholder="3600"></div>
+      <div class="form-group"><label>🎬 SmartStrm Webhook</label><input type="text" id="cfgStrmWebhook" placeholder="http://192.168.31.100:8024/webhook/xxx"></div>
+      <div class="form-group"><label>📋 SmartStrm 任务名</label><input type="text" id="cfgStrmTasks" placeholder="阿里电视剧,阿里动漫"></div>
+      <div class="form-group"><label>📂 OpenList 地址</label><input type="text" id="cfgOpenlistUrl" placeholder="http://192.168.31.100:5244"></div>
+      <div class="form-group"><label>🔑 OpenList Token</label><input type="text" id="cfgOpenlistToken" placeholder="alist-xxx"></div>
+      <div class="form-group"><label>🗄️ OpenList 存储 ID</label><input type="number" id="cfgOpenlistStorageId" placeholder="0（留空=只刷新目录）"></div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="saveSettings()">💾 保存设置</button>
+        <button class="btn btn-outline" onclick="testToken()" style="margin-left:8px">🔍 测试连接</button>
+      </div>
+      <div id="settingsMsg" style="margin-top:12px;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ 编辑订阅</h3>
+    <input type="hidden" id="editId">
+    <div class="form-group"><label>📋 订阅任务名</label><input type="text" id="editName"></div>
+    <div class="form-group"><label>🔗 订阅地址</label><input type="text" id="editShareUrl"></div>
+    <div class="form-group"><label>📂 保存目录 ID</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="editParentId" placeholder="阿里云盘目录 file_id" style="flex:1">
+        <button class="btn btn-outline btn-sm" onclick="openDirPicker()">📂 浏览</button>
+      </div>
+    </div>
+    <div class="form-group"><label>📝 保存名称模板</label><input type="text" id="editFileName" placeholder="如：S01E"></div>
+    <div class="form-group"><label>📊 状态</label>
+      <select id="editStatus" style="width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px">
+        <option value="1">订阅中</option>
+        <option value="2">暂停</option>
+        <option value="4">完结</option>
+        <option value="3">失效</option>
+      </select>
+    </div>
+    <div class="form-group"><label>📅 检查星期（留空=每天）</label>
+      <div id="editDays" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="0" style="display:none"> 周一
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="1" style="display:none"> 周二
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="2" style="display:none"> 周三
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="3" style="display:none"> 周四
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="4" style="display:none"> 周五
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="5" style="display:none"> 周六
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid #d9d9d9;border-radius:6px;transition:all .2s">
+          <input type="checkbox" value="6" style="display:none"> 周日
+        </label>
+      </div>
+    </div>
+    <div class="form-group"><label>🔢 截止记录 ID</label>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="editEndFileNo" placeholder="留空=全部" style="flex:1">
+        <button class="btn btn-outline btn-sm" onclick="openSharePicker()">📂 浏览</button>
+      </div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px">选择一集后，只转存该集之后的更新</div>
+    </div>
+    <div style="text-align:right;margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-success" onclick="manualSubscribe()">📥 手动订阅</button>
+      <button class="btn btn-outline" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 转存记录弹窗 -->
+<div class="overlay" id="recordsModal">
+  <div class="modal">
+    <h3 id="recordsTitle">转存记录</h3>
+    <div id="recordsContent" style="max-height:60vh;overflow-y:auto">加载中...</div>
+    <div style="text-align:right;margin-top:16px"><button class="btn btn-outline" onclick="closeModal('recordsModal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- 目录选择弹窗 -->
+<div class="overlay" id="dirPickerModal">
+  <div class="modal">
+    <h3>📂 选择保存目录</h3>
+    <div id="dirPickerBreadcrumb" style="font-size:12px;color:#667eea;margin-bottom:12px"></div>
+    <div id="dirPickerContent" style="max-height:500px;overflow-y:auto">加载中...</div>
+    <div style="text-align:right;margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal('dirPickerModal')">取消</button>
+      <button class="btn btn-primary" onclick="selectCurrentDir()">✅ 选择当前目录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 分享文件选择弹窗 -->
+<div class="overlay" id="sharePickerModal">
+  <div class="modal">
+    <h3>📂 选择截止集数</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">选择一集后，将只转存该集之后（不含该集）的更新</div>
+    <div id="sharePickerContent" style="max-height:500px;overflow-y:auto">加载中...</div>
+    <div style="text-align:right;margin-top:16px"><button class="btn btn-outline" onclick="closeModal('sharePickerModal')">取消</button></div>
+  </div>
+</div>
+
+<!-- 订阅日志弹窗 -->
+<div class="overlay" id="logsModal">
+  <div class="modal" style="max-width:900px">
+    <h3>📋 订阅日志</h3>
+    <div id="logsContent" style="background:#1e1e1e;border-radius:8px;padding:16px;max-height:60vh;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.8;color:#d4d4d4">
+      加载中...
+    </div>
+    <div style="text-align:right;margin-top:16px"><button class="btn btn-outline" onclick="hideLogs()">关闭</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var allSubs = [];
+
+function esc(s){ return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+function fmtSize(b){ if(!b)return '-'; if(b<1024)return b+'B'; if(b<1048576)return(b/1024).toFixed(1)+'KB'; if(b<1073741824)return(b/1048576).toFixed(1)+'MB'; return(b/1073741824).toFixed(2)+'GB'; }
+function showToast(msg,ok){ var t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(ok?'toast-ok':'toast-err')+' show'; setTimeout(function(){t.className='toast';},3000); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ─── 星期选择器 ──────────────────────────────────────
+function initDayCheckboxes(){
+  document.querySelectorAll('#editDays label').forEach(function(lbl){
+    var cb = lbl.querySelector('input[type=checkbox]');
+    lbl.addEventListener('click', function(e){
+      e.preventDefault();
+      cb.checked = !cb.checked;
+      lbl.classList.toggle('day-checked', cb.checked);
+    });
+  });
+}
+function getSelectedDays(){
+  var days = [];
+  document.querySelectorAll('#editDays input[type=checkbox]').forEach(function(cb){
+    if(cb.checked) days.push(parseInt(cb.value));
+  });
+  return days.join(',');
+}
+function setSelectedDays(str){
+  var arr = str ? str.split(',').map(function(s){return parseInt(s.trim());}) : [];
+  document.querySelectorAll('#editDays label').forEach(function(lbl){
+    var cb = lbl.querySelector('input[type=checkbox]');
+    var val = parseInt(cb.value);
+    cb.checked = arr.indexOf(val) >= 0;
+    lbl.classList.toggle('day-checked', cb.checked);
+  });
+}
+function formatDays(str){
+  if(!str) return '每天';
+  var names = ['周一','周二','周三','周四','周五','周六','周日'];
+  return str.split(',').map(function(s){return names[parseInt(s.trim())]||s;}).join('、');
+}
+initDayCheckboxes();
+function switchTab(e,name){ document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');}); document.querySelectorAll('.tabs a').forEach(function(a){a.classList.remove('active');}); document.getElementById(name).classList.add('active'); e.target.classList.add('active'); if(name==='tab-browser') browseFiles('root'); }
+
+// ─── 订阅管理 ──────────────────────────────────────
+function refreshSubs(){
+  showToast('🔍 正在检查所有订阅中任务...',true);
+  // 先触发检查，再刷新列表
+  fetch('/api/check-all',{method:'POST'}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      var count=d.data.count||0;
+      if(count>0) showToast('✅ 检查完成，'+count+'个订阅有更新',true);
+      else showToast('✅ 检查完成，无更新',true);
+    }
+    // 无论检查结果如何，刷新列表
+    return fetch('/api/subscriptions');
+  }).then(function(r){return r.json();}).then(function(d){
+    allSubs = d.data || [];
+    filterSubs();
+    renderStats(allSubs);
+  }).catch(function(){showToast('操作失败',false);});
+}
+
+function renderStats(subs){
+  var total=subs.length, active=subs.filter(function(s){return s.status===1;}).length, failed=subs.filter(function(s){return s.status===3;}).length, records=subs.reduce(function(a,s){return a+(s.record_count||0);},0);
+  document.getElementById('statsGrid').innerHTML=
+    '<div class="stat-card"><div class="label">📋 订阅总数</div><div class="value">'+total+'</div></div>'+
+    '<div class="stat-card"><div class="label">✅ 订阅中</div><div class="value" style="color:#52c41a">'+active+'</div></div>'+
+    '<div class="stat-card"><div class="label">❌ 失效</div><div class="value" style="color:#ff4d4f">'+failed+'</div></div>'+
+    '<div class="stat-card"><div class="label">📄 累计转存</div><div class="value" style="color:#667eea">'+records+'</div></div>';
+}
+
+// ─── 新增订阅 ──────────────────────────────────────
+function openAddSub(){
+  document.getElementById('editId').value='';
+  document.getElementById('editName').value='';
+  document.getElementById('editShareUrl').value='';
+  document.getElementById('editParentId').value='';
+  document.getElementById('editFileName').value='S01E';
+  document.getElementById('editStatus').value='1';
+  document.getElementById('editEndFileNo').value='';
+  setSelectedDays('');
+  document.querySelector('#editModal h3').textContent='➕ 新增订阅';
+  document.getElementById('editModal').classList.add('open');
+}
+
+// ─── 编辑订阅 ──────────────────────────────────────
+function openEdit(id){
+  var s = null;
+  for(var i=0;i<allSubs.length;i++){ if(allSubs[i].id===id){ s=allSubs[i]; break; } }
+  if(!s){ showToast('找不到订阅 #'+id, false); return; }
+  document.querySelector('#editModal h3').textContent='✏️ 编辑订阅';
+  document.getElementById('editId').value = s.id;
+  document.getElementById('editName').value = s.name || '';
+  document.getElementById('editShareUrl').value = s.share_url || '';
+  document.getElementById('editParentId').value = s.to_parent_id || '';
+  document.getElementById('editFileName').value = s.to_file_name || '';
+  document.getElementById('editStatus').value = s.status || 1;
+  document.getElementById('editEndFileNo').value = s.last_file_no || '';
+  setSelectedDays(s.check_days || '');
+  document.getElementById('editModal').classList.add('open');
+}
+
+function saveEdit(){
+  var id = parseInt(document.getElementById('editId').value);
+  var data = {
+    name: document.getElementById('editName').value,
+    share_url: document.getElementById('editShareUrl').value,
+    to_parent_id: document.getElementById('editParentId').value,
+    to_file_name: document.getElementById('editFileName').value,
+    status: parseInt(document.getElementById('editStatus').value),
+    last_file_no: parseInt(document.getElementById('editEndFileNo').value) || 0,
+    check_days: getSelectedDays()
+  };
+  var url = id ? '/api/subscriptions/'+id : '/api/subscriptions';
+  var method = id ? 'PUT' : 'POST';
+  fetch(url, {
+    method: method,
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){ showToast('✅ 保存成功',true); closeModal('editModal'); refreshSubs(); }
+    else showToast('保存失败: '+d.msg, false);
+  }).catch(function(){ showToast('保存失败',false); });
+}
+
+// ─── 转存记录 ──────────────────────────────────────
+function showRecords(id){
+  var name = '';
+  for(var i=0;i<allSubs.length;i++){ if(allSubs[i].id===id){ name=allSubs[i].name; break; } }
+  document.getElementById('recordsTitle').textContent = name + ' - 转存记录';
+  document.getElementById('recordsModal').classList.add('open');
+  fetch('/api/subscriptions/'+id+'/records').then(function(r){return r.json();}).then(function(d){
+    var html = '';
+    if(!d.data||!d.data.length){ html='<div class="empty">暂无记录</div>'; }
+    else{
+      html='<table><thead><tr><th>源文件</th><th>→</th><th>目标文件</th><th>时间</th></tr></thead><tbody>';
+      d.data.forEach(function(r){
+        html+='<tr><td>'+esc(r.share_file_name)+'</td><td style="color:#ccc">→</td><td>'+esc(r.to_file_name||'-')+'</td><td style="font-size:12px;color:#aaa">'+esc(r.created_at||'')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    document.getElementById('recordsContent').innerHTML = html;
+  });
+}
+
+// ─── 去重清理 ──────────────────────────────────────
+function doCleanup(id){
+  var name = '';
+  for(var i=0;i<allSubs.length;i++){ if(allSubs[i].id===id){ name=allSubs[i].name; break; } }
+  if(!confirm('确认清理【'+name+'】的重复文件？')) return;
+  showToast('清理中...', true);
+  fetch('/api/cleanup/scan').then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){ showToast('无重复文件',true); return; }
+    var found = null;
+    d.data.forEach(function(item){ if(item.name===name) found=item; });
+    if(!found||!found.files.length){ showToast('无重复文件',true); return; }
+    var ids = [];
+    found.files.forEach(function(f){ ids.push(f.old_id); });
+    fetch('/api/files/batch-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file_ids:ids})}).then(function(r){return r.json();}).then(function(r){
+      if(r.code===0) showToast('✅ 已删除 '+r.deleted+' 个重复文件',true);
+      else showToast('删除失败',false);
+    });
+  });
+}
+
+function dryRunCleanup(){
+  document.getElementById('cleanupResult').innerHTML='<div class="empty">扫描中...</div>';
+  fetch('/api/cleanup/scan').then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){ document.getElementById('cleanupResult').innerHTML='<div class="empty">'+(d.msg||'无重复文件')+'</div>'; return; }
+    var html='<table><thead><tr><th>订阅</th><th>重复文件</th><th>已有正确文件</th></tr></thead><tbody>';
+    d.data.forEach(function(item){
+      item.files.forEach(function(f){
+        html+='<tr><td>'+esc(item.name)+'</td><td style="color:#ff4d4f">'+esc(f.old)+'</td><td style="color:#52c41a">'+esc(f.new)+'</td></tr>';
+      });
+    });
+    html+='</tbody></table>';
+    document.getElementById('cleanupResult').innerHTML=html;
+  }).catch(function(e){
+    document.getElementById('cleanupResult').innerHTML='<div class="empty">扫描失败</div>';
+  });
+}
+
+// ─── 文件浏览器 ──────────────────────────────────────
+var browsePath=[{id:'root',name:'根目录'}];
+function browseFiles(parentId,name){
+  if(parentId==='root') browsePath=[{id:'root',name:'根目录'}];
+  else if(name) browsePath.push({id:parentId,name:name});
+  renderBreadcrumb();
+  document.getElementById('fileList').innerHTML='<div class="empty">加载中...</div>';
+  fetch('/api/files?parent_file_id='+parentId).then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){ document.getElementById('fileList').innerHTML='<div class="empty">'+(d.msg||'空目录')+'</div>'; return; }
+    var html='';
+    d.data.forEach(function(f){
+      var isFolder=f.type==='folder';
+      var icon=isFolder?'📁':'📄';
+      var ext=(f.name||'').split('.').pop().toLowerCase();
+      if(['mp4','mkv'].includes(ext)) icon='🎬';
+      var size=isFolder?'':fmtSize(f.size||0);
+      var onclick=isFolder?' onclick="browseFiles(\''+f.file_id+'\',\''+esc(f.name)+'\')"' : '';
+      html+='<div class="file-item"'+onclick+'><span class="icon">'+icon+'</span><span class="name">'+esc(f.name)+'</span><span class="size">'+size+'</span></div>';
+    });
+    document.getElementById('fileList').innerHTML=html;
+  });
+}
+
+function renderBreadcrumb(){
+  var html='';
+  browsePath.forEach(function(p,i){
+    if(i>0) html+='<span>/</span>';
+    html+='<a href="#" onclick="browseFiles(\''+p.id+'\')">'+esc(p.name)+'</a>';
+  });
+  document.getElementById('breadcrumb').innerHTML=html;
+}
+
+// ─── 时钟 ──────────────────────────────────────
+setInterval(function(){ document.getElementById('clock').textContent=new Date().toLocaleString('zh-CN'); },1000);
+
+// ─── 云盘设置 ──────────────────────────────────────
+function loadSettings(){
+  fetch('/api/settings').then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      document.getElementById('cfgToken').value=d.data.token||'';
+      document.getElementById('cfgWebhook').value=d.data.webhook||'';
+      document.getElementById('cfgInterval').value=d.data.interval||3600;
+      document.getElementById('cfgStrmWebhook').value=d.data.strm_webhook||'';
+      document.getElementById('cfgStrmTasks').value=d.data.strm_tasks||'';
+      document.getElementById('cfgOpenlistUrl').value=d.data.openlist_url||'';
+      document.getElementById('cfgOpenlistToken').value=d.data.openlist_token||'';
+      document.getElementById('cfgOpenlistStorageId').value=d.data.openlist_storage_id||'';
+      loadDrives(d.data.drive_id);
+    }
+  });
+}
+
+function loadDrives(selectedId){
+  fetch('/api/drives').then(function(r){return r.json();}).then(function(d){
+    var sel=document.getElementById('cfgDriveId');
+    sel.innerHTML='';
+    if(d.code===0&&d.data.length){
+      d.data.forEach(function(drive){
+        var opt=document.createElement('option');
+        opt.value=drive.drive_id;
+        var used=drive.used_size/1073741824/1024;
+        var total=drive.total_size/1073741824/1024;
+        var usedStr=used>=1?used.toFixed(2)+' TB':(drive.used_size/1073741824).toFixed(2)+' GB';
+        var totalStr=total>=1?total.toFixed(2)+' TB':(drive.total_size/1073741824).toFixed(2)+' GB';
+        opt.textContent=drive.drive_name+' ('+drive.drive_id+') - '+usedStr+' / '+totalStr;
+        if(drive.drive_id===selectedId) opt.selected=true;
+        sel.appendChild(opt);
+      });
+      document.getElementById('driveInfo').textContent='选择要使用的云盘，备份盘用于备份，资源盘用于存储影视';
+    } else {
+      sel.innerHTML='<option value="">获取失败，请检查 Token</option>';
+      document.getElementById('driveInfo').textContent='';
+    }
+  }).catch(function(){
+    document.getElementById('cfgDriveId').innerHTML='<option value="">网络错误</option>';
+  });
+}
+
+function saveSettings(){
+  var data={
+    token: document.getElementById('cfgToken').value,
+    drive_id: document.getElementById('cfgDriveId').value,
+    webhook: document.getElementById('cfgWebhook').value,
+    interval: parseInt(document.getElementById('cfgInterval').value)||3600,
+    strm_webhook: document.getElementById('cfgStrmWebhook').value,
+    strm_tasks: document.getElementById('cfgStrmTasks').value,
+    openlist_url: document.getElementById('cfgOpenlistUrl').value,
+    openlist_token: document.getElementById('cfgOpenlistToken').value,
+    openlist_storage_id: parseInt(document.getElementById('cfgOpenlistStorageId').value)||0
+  };
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){ showToast('✅ 设置已保存',true); document.getElementById('settingsMsg').innerHTML='<span style="color:#52c41a">✅ 保存成功，刷新后生效</span>'; }
+    else showToast('保存失败',false);
+  }).catch(function(){ showToast('保存失败',false); });
+}
+
+function testToken(){
+  document.getElementById('settingsMsg').innerHTML='<span style="color:#667eea">🔄 测试中...</span>';
+  fetch('/api/settings/test').then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      document.getElementById('settingsMsg').innerHTML='<span style="color:#52c41a">✅ 连接成功: '+esc(d.data.user_name)+' (drive_id: '+esc(d.data.drive_id)+')</span>';
+      loadDrives(d.data.drive_id);
+    }
+    else document.getElementById('settingsMsg').innerHTML='<span style="color:#ff4d4f">❌ 连接失败: '+esc(d.msg)+'</span>';
+  }).catch(function(){ document.getElementById('settingsMsg').innerHTML='<span style="color:#ff4d4f">❌ 请求失败</span>'; });
+}
+
+// 切换到设置 tab 时自动加载
+var origSwitchTab = switchTab;
+switchTab = function(e,name){
+  origSwitchTab(e,name);
+  if(name==='tab-settings') loadSettings();
+};
+
+// ─── 目录选择器 ──────────────────────────────────────
+var dirPickerCurrentId = 'root';
+
+function openDirPicker(){
+  dirPickerCurrentId = 'root';
+  document.getElementById('dirPickerModal').classList.add('open');
+  dirPickerBrowse('root');
+}
+
+function dirPickerBrowse(parentFileId){
+  dirPickerCurrentId = parentFileId;
+  var bc = document.getElementById('dirPickerBreadcrumb');
+  bc.innerHTML = parentFileId === 'root' ? '<b>根目录</b>' : '<a href="#" onclick="dirPickerBrowse(\'root\')">根目录</a> / <b>'+parentFileId+'</b>';
+  document.getElementById('dirPickerContent').innerHTML='<div style="color:#aaa;text-align:center;padding:20px">加载中...</div>';
+  fetch('/api/files?parent_file_id='+parentFileId).then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){
+      document.getElementById('dirPickerContent').innerHTML='<div style="color:#aaa;text-align:center;padding:20px">空目录</div>';
+      return;
+    }
+    var html='';
+    d.data.forEach(function(f){
+      if(f.type==='folder'){
+        html+='<div class="file-item folder" onclick="dirPickerBrowse(\''+f.file_id+'\')" style="cursor:pointer">';
+        html+='<span class="file-icon">📁</span>';
+        html+='<span class="file-name">'+esc(f.name)+'</span>';
+        html+='<span class="file-size">📂 进入</span>';
+        html+='</div>';
+      }
+    });
+    if(!html) html='<div style="color:#aaa;text-align:center;padding:20px">无子文件夹</div>';
+    document.getElementById('dirPickerContent').innerHTML=html;
+  }).catch(function(){
+    document.getElementById('dirPickerContent').innerHTML='<div style="color:#ff4d4f;text-align:center">加载失败</div>';
+  });
+}
+
+function selectCurrentDir(){
+  document.getElementById('editParentId').value = dirPickerCurrentId;
+  closeModal('dirPickerModal');
+  showToast('✅ 已选择目录: '+dirPickerCurrentId,true);
+}
+
+// ─── 分享文件选择器 ──────────────────────────────────────
+function openSharePicker(){
+  var id=parseInt(document.getElementById('editId').value);
+  if(!id){ showToast('请先保存订阅',false); return; }
+  document.getElementById('sharePickerModal').classList.add('open');
+  document.getElementById('sharePickerContent').innerHTML='<div style="color:#aaa;text-align:center;padding:20px">加载中...</div>';
+  fetch('/api/subscriptions/'+id+'/share_files').then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){
+      document.getElementById('sharePickerContent').innerHTML='<div style="color:#aaa;text-align:center">无文件或加载失败</div>';
+      return;
+    }
+    var html='<table><thead><tr><th>集数</th><th>文件名</th><th>操作</th></tr></thead><tbody>';
+    d.data.forEach(function(f){
+      var epLabel = f.episode > 0 ? 'E'+String(f.episode).padStart(2,'0') : '-';
+      html+='<tr><td style="font-weight:600;color:#667eea">'+epLabel+'</td><td style="font-size:12px">'+esc(f.name)+'</td>';
+      html+='<td><button class="btn btn-primary btn-sm" onclick="selectShareFile('+f.episode+')">选择</button></td></tr>';
+    });
+    html+='</tbody></table>';
+    document.getElementById('sharePickerContent').innerHTML=html;
+  }).catch(function(){
+    document.getElementById('sharePickerContent').innerHTML='<div style="color:#ff4d4f;text-align:center">加载失败</div>';
+  });
+}
+
+function selectShareFile(episode){
+  document.getElementById('editEndFileNo').value=episode;
+  closeModal('sharePickerModal');
+  showToast('✅ 已设置截止集数: E'+String(episode).padStart(2,'0')+'（从下一集开始订阅）',true);
+}
+
+// 手动订阅（从编辑弹窗触发）
+function manualSubscribe(){
+  var id=parseInt(document.getElementById('editId').value);
+  var name=document.getElementById('editName').value;
+  // 先保存
+  saveEdit();
+  // 然后触发检查
+  showToast('📥 手动订阅: '+name,true);
+  fetch('/api/subscriptions/'+id+'/check',{method:'POST'}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      var r=d.data;
+      if(r.count>0) showToast('✅ '+r.name+': 转存 '+r.count+' 个文件',true);
+      else showToast('✅ '+r.name+': 无新文件',true);
+      refreshSubs();
+    } else showToast('订阅失败: '+d.msg,false);
+  }).catch(function(){ showToast('订阅失败',false); });
+}
+
+// 手动检查单个订阅
+function manualCheck(id){
+  var name='';
+  for(var i=0;i<allSubs.length;i++){if(allSubs[i].id===id){name=allSubs[i].name;break;}}
+  showToast('🔍 正在检查 '+name+'...',true);
+  showLogs();
+  fetch('/api/subscriptions/'+id+'/check',{method:'POST'}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      var r=d.data;
+      if(r.count>0) showToast('✅ '+r.name+': 转存 '+r.count+' 个文件',true);
+      else showToast('✅ '+r.name+': 无新文件',true);
+      refreshSubs();
+    } else showToast('检查失败: '+d.msg,false);
+  }).catch(function(){ showToast('检查失败',false); });
+}
+
+// 删除订阅
+function deleteSub(id, name){
+  if(!confirm('确定删除订阅「'+name+'」？\n\n⚠️ 删除后不可恢复，转存记录也会一并清除。')) return;
+  fetch('/api/subscriptions/'+id,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      showToast('✅ 已删除「'+name+'」',true);
+      refreshSubs();
+    } else showToast('删除失败: '+d.msg,false);
+  }).catch(function(){ showToast('删除失败',false); });
+}
+
+// ─── 状态过滤 ──────────────────────────────────────
+function filterSubs(){
+  var filter = document.getElementById('subStatusFilter').value;
+  var filtered = filter === 'all' ? allSubs : allSubs.filter(function(s){ return String(s.status) === filter; });
+  renderSubs(filtered);
+}
+
+function renderSubs(subs){
+  var tbody = document.getElementById('subsBody');
+  document.getElementById('subCount').innerHTML = subs.length + ' / ' + allSubs.length;
+  if(!subs.length){ tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#aaa">无订阅数据</td></tr>'; return; }
+  var statusOrder = {1:0, 2:1, 4:2, 3:3, 0:4};
+  subs.sort(function(a,b){ return (statusOrder[a.status]||9) - (statusOrder[b.status]||9); });
+  var html='';
+  subs.forEach(function(s){
+    var statusMap={0:{text:'未知',color:'#d9d9d9'},1:{text:'订阅中',color:'#52c41a'},2:{text:'暂停',color:'#faad14'},3:{text:'失效',color:'#ff4d4f'},4:{text:'完结',color:'#1890ff'}};
+    var st=statusMap[s.status]||statusMap[0];
+    html+='<tr>';
+    html+='<td>'+s.id+'</td>';
+    html+='<td><b>'+esc(s.name)+'</b></td>';
+    html+='<td><span style="background:'+st.color+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">'+st.text+'</span></td>';
+    html+='<td style="font-size:12px">'+formatDays(s.check_days||'')+'</td>';
+    html+='<td style="font-size:12px">'+esc(s.to_file_name||'-')+'</td>';
+    html+='<td style="font-size:12px">'+esc(s.last_file_name||'-')+'</td>';
+    html+='<td style="font-size:12px;color:#667eea">'+esc(s.rename_preview||'-')+'</td>';
+    html+='<td style="text-align:center"><a href="#" onclick="openRecords('+s.id+');return false" style="color:#667eea">'+(s.record_count||0)+'</a></td>';
+    html+='<td>';
+    html+='<button class="btn btn-outline btn-sm" onclick="openEdit('+s.id+')">✏️ 编辑</button> ';
+    html+='<button class="btn btn-primary btn-sm" onclick="manualCheck('+s.id+')">🔍 检查</button> ';
+    html+='<button class="btn btn-danger btn-sm" onclick="deleteSub('+s.id+',\''+esc(s.share_title)+'\')">🗑️ 删除</button>';
+    html+='</td></tr>';
+  });
+  tbody.innerHTML=html;
+}
+
+// ─── 订阅日志 ──────────────────────────────────────
+var logTimer = null;
+
+function showLogs(){
+  document.getElementById('logsModal').classList.add('open');
+  loadLogs(true);
+  // 每3秒自动刷新
+  if(logTimer) clearInterval(logTimer);
+  logTimer = setInterval(loadLogs, 3000);
+}
+
+function hideLogs(){
+  closeModal('logsModal');
+  if(logTimer){ clearInterval(logTimer); logTimer = null; }
+}
+
+function loadLogs(forceBottom){
+  var box=document.getElementById('logsContent');
+  // 保存当前滚动位置
+  var scrollTop = box.scrollTop;
+  var scrollHeight = box.scrollHeight;
+  var clientHeight = box.clientHeight;
+  var atBottom = forceBottom || (scrollHeight - scrollTop - clientHeight < 50);
+  fetch('/api/logs').then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){ box.innerHTML='<div style="color:#aaa;text-align:center">暂无日志</div>'; return; }
+    var html='';
+    d.data.forEach(function(line){
+      var color='#d4d4d4';
+      if(line.indexOf('✅')>=0) color='#52c41a';
+      else if(line.indexOf('❌')>=0) color='#ff4d4f';
+      else if(line.indexOf('📥')>=0) color='#667eea';
+      else if(line.indexOf('🗑️')>=0) color='#faad14';
+      else if(line.indexOf('检查所有')>=0) color='#1890ff';
+      html+='<div style="color:'+color+'">'+esc(line)+'</div>';
+    });
+    box.innerHTML=html;
+    if(atBottom){
+      requestAnimationFrame(function(){ box.scrollTop=box.scrollHeight; });
+    } else {
+      // 恢复之前的滚动位置（补偿新增内容的高度差）
+      box.scrollTop = scrollTop + (box.scrollHeight - scrollHeight);
+    }
+  }).catch(function(){});
+}
+
+// ─── 账户信息 ──────────────────────────────────────
+function loadAccount(){
+  fetch('/api/account').then(function(r){return r.json();}).then(function(d){
+    if(d.code===0){
+      var a=d.data;
+      var html='<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:4px">🔑 APP登录</span>';
+      html+='<span>👤 '+esc(a.nick_name)+' ('+esc(a.user_name)+')</span>';
+      html+='<span>💾 '+a.used_str+' / '+a.total_str+' ('+a.percent+'%)</span>';
+      document.getElementById('accountInfo').innerHTML=html;
+    } else {
+      document.getElementById('accountInfo').innerHTML='<span style="color:#ffaaaa">⚠️ token无效</span>';
+    }
+  }).catch(function(){});
+}
+
+// ─── 初始化 ──────────────────────────────────────
+loadAccount();
+// 页面加载只刷列表，不触发检查
+fetch('/api/subscriptions').then(function(r){return r.json();}).then(function(d){
+  allSubs = d.data || [];
+  filterSubs();
+  renderStats(allSubs);
+}).catch(function(){});
+</script>
+</body>
+</html>

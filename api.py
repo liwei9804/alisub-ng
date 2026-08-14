@@ -152,7 +152,7 @@ class AliyunDriveAPI:
             if marker:
                 body["marker"] = marker
             resp = requests.post(
-                f"{self.V2_SHARE_BASE}/file_list",
+                "https://api.aliyundrive.com/adrive/v2/file/list",
                 json=body, headers=headers, timeout=30,
             )
             data = resp.json()
@@ -166,38 +166,48 @@ class AliyunDriveAPI:
     def save_share_files(self, share_id: str, file_ids: list,
                          to_parent_id: str, share_pwd: str = "",
                          new_names: Optional[list] = None) -> dict:
-        """将分享文件保存到自己的网盘
+        """将分享文件逐个复制到自己的网盘（使用 v2/file/copy）
 
-        Args:
-            share_id: 分享链接 ID
-            file_ids: 要保存的文件 ID 列表
-            to_parent_id: 目标目录 ID
-            share_pwd: 分享密码
-            new_names: 重命名列表（与 file_ids 一一对应）
-
-        Returns:
-            {"task_id": "..."} 或 {"results": [...]}
+        使用已验证可用的 API：user token + x-share-token 调用 v2/file/copy
         """
         share_token = self.get_share_token(share_id, share_pwd)
-        headers = {"x-share-token": share_token}
+        results = []
 
-        body = {
-            "share_id": share_id,
-            "file_ids": file_ids,
-            "to_parent_file_id": to_parent_id,
-            "to_drive_id": self.drive_id,
-            "auto_rename": False,
-        }
-        if new_names:
-            body["new_names"] = new_names
+        for i, fid in enumerate(file_ids):
+            body = {
+                "share_id": share_id,
+                "drive_id": "",  # 会从 share_token 自动获取
+                "file_id": fid,
+                "to_drive_id": self.drive_id,
+                "to_parent_file_id": to_parent_id,
+                "auto_rename": False,
+            }
+            if new_names and i < len(new_names):
+                body["new_name"] = new_names[i]
 
-        resp = requests.post(
-            f"{self.V2_SHARE_BASE}/save_to_drive",
-            json=body, headers=headers, timeout=60,
-        )
-        data = resp.json()
-        log.info(f"保存结果: {data}")
-        return data
+            resp = self.session.post(
+                "https://api.aliyundrive.com/v2/file/copy",
+                json=body,
+                headers={**self._headers(), "x-share-token": share_token},
+                timeout=60,
+            )
+            data = resp.json()
+            log.info(f"保存结果 [{fid}]: {data}")
+
+            if resp.status_code == 201 or data.get("file_id"):
+                results.append({
+                    "file_id": data.get("file_id", ""),
+                    "name": data.get("name", ""),
+                })
+            elif resp.status_code == 409 or "already exists" in str(data).lower():
+                log.warning(f"文件已存在: {data}")
+                results.append({"file_id": "", "name": "", "existed": True})
+            else:
+                raise Exception(f"保存失败: {data}")
+
+            time.sleep(1)
+
+        return {"results": results}
 
     # ─── 创建目录 ──────────────────────────────────────────
 

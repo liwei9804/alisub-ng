@@ -1,0 +1,13 @@
+services:
+  alisub-ng:
+    image: 2063335995/alisub-ng:latest
+    container_name: alisub-ng
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - PORT=8003
