@@ -26,8 +26,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("alisub-ng")
 
-REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "c39092bdb98348078c20a9c2d3e5e7c0")
-DRIVE_ID = os.environ.get("DRIVE_ID", "840490182")
+REFRESH_TOKEN = os.environ.get("REFRESH_TOKEN", "")
+DRIVE_ID = os.environ.get("DRIVE_ID", "")
 ALISUB_DB = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
 PORT = int(os.environ.get("PORT", "8003"))
 
