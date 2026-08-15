@@ -63,6 +63,7 @@ tr:hover{background:#f9f9ff}
 .day-checked{background:#667eea!important;color:#fff!important;border-color:#667eea!important}
 </style>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='68' font-family='Arial,sans-serif' font-size='48' font-weight='bold' fill='white' text-anchor='middle'>AS</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -135,7 +136,12 @@ tr:hover{background:#f9f9ff}
   <div id="tab-settings" class="tab-content">
     <div class="card">
       <div class="card-title">⚙️ 云盘设置</div>
-      <div class="form-group"><label>🔑 Refresh Token</label><input type="text" id="cfgToken" placeholder="阿里云盘 refresh_token"></div>
+      <div class="form-group"><label>🔑 Refresh Token</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="cfgToken" placeholder="阿里云盘 refresh_token" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="startQrLogin()">📱 扫码获取</button>
+        </div>
+      </div>
       <div class="form-group"><label>💾 Drive ID</label>
         <div style="display:flex;gap:8px;align-items:center">
           <select id="cfgDriveId" style="flex:1;padding:8px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px">
@@ -263,6 +269,21 @@ tr:hover{background:#f9f9ff}
       加载中...
     </div>
     <div style="text-align:right;margin-top:16px"><button class="btn btn-outline" onclick="hideLogs()">关闭</button></div>
+  </div>
+</div>
+
+<!-- 扫码登录弹窗 -->
+<div class="overlay" id="qrModal">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <h3>📱 扫码登录阿里云盘</h3>
+    <div id="qrContent" style="padding:20px 0">
+      <div style="color:#aaa">正在生成二维码...</div>
+    </div>
+    <div id="qrStatus" style="font-size:13px;color:#888;margin-bottom:12px">请使用阿里云盘 App 扫描二维码</div>
+    <div style="text-align:right;margin-top:16px;display:flex;gap:8px;justify-content:center">
+      <button class="btn btn-outline" onclick="closeQrModal()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="startQrLogin()" id="qrRefreshBtn" style="display:none">🔄 重新生成</button>
+    </div>
   </div>
 </div>
 
@@ -769,6 +790,112 @@ function loadLogs(forceBottom){
   }).catch(function(){});
 }
 
+// ─── 扫码登录 ──────────────────────────────────────
+var qrPollTimer = null;
+var qrCk = '';
+var qrT = '';
+
+function startQrLogin(){
+  document.getElementById('qrModal').classList.add('open');
+  document.getElementById('qrContent').innerHTML='<div style="color:#aaa">正在生成二维码...</div>';
+  document.getElementById('qrStatus').textContent='请使用阿里云盘 App 扫描二维码';
+  document.getElementById('qrStatus').style.color='#888';
+  document.getElementById('qrRefreshBtn').style.display='none';
+  if(qrPollTimer){ clearInterval(qrPollTimer); qrPollTimer=null; }
+
+  fetch('/api/qrcode/generate').then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0){ document.getElementById('qrContent').innerHTML='<div style="color:#ff4d4f">❌ '+esc(d.msg)+'</div>'; return; }
+    qrCk = d.data.ck;
+    qrT = d.data.t;
+    var url = d.data.content;
+    // 本地生成二维码（SVG）
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      var modCount = qr.getModuleCount();
+      var cellSize = 5;
+      var margin = 4;
+      var size = (modCount + margin * 2) * cellSize;
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">';
+      svg += '<rect width="'+size+'" height="'+size+'" fill="white"/>';
+      for(var r=0;r<modCount;r++){
+        for(var c=0;c<modCount;c++){
+          if(qr.isDark(r,c)){
+            svg+='<rect x="'+((c+margin)*cellSize)+'" y="'+((r+margin)*cellSize)+'" width="'+cellSize+'" height="'+cellSize+'" fill="black"/>';
+          }
+        }
+      }
+      svg+='</svg>';
+      document.getElementById('qrContent').innerHTML=svg;
+    } catch(e) {
+      var qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(url);
+      document.getElementById('qrContent').innerHTML='<img src="'+qrImg+'" width="200" height="200">';
+    }
+    // 开始轮询状态
+    pollQrStatus();
+  }).catch(function(e){
+    document.getElementById('qrContent').innerHTML='<div style="color:#ff4d4f">❌ 网络错误</div>';
+  });
+}
+
+function pollQrStatus(){
+  if(qrPollTimer) clearInterval(qrPollTimer);
+  qrPollTimer = setInterval(function(){
+    if(!qrCk) return;
+    fetch('/api/qrcode/query',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ck:qrCk,t:qrT})
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.code!==0){
+        document.getElementById('qrStatus').textContent='❌ '+esc(d.msg);
+        document.getElementById('qrStatus').style.color='#ff4d4f';
+        clearInterval(qrPollTimer); qrPollTimer=null;
+        document.getElementById('qrRefreshBtn').style.display='inline-block';
+        return;
+      }
+      var st = d.data.status;
+      if(st==='NEW'){
+        document.getElementById('qrStatus').textContent='⏳ 等待扫描...';
+        document.getElementById('qrStatus').style.color='#888';
+      } else if(st==='SCANED'){
+        document.getElementById('qrStatus').textContent='📲 已扫描，请在手机上确认登录';
+        document.getElementById('qrStatus').style.color='#667eea';
+      } else if(st==='CONFIRMED'){
+        clearInterval(qrPollTimer); qrPollTimer=null;
+        var token = d.data.refresh_token;
+        if(token){
+          document.getElementById('qrStatus').textContent='✅ 登录成功！已自动填入 Token';
+          document.getElementById('qrStatus').style.color='#52c41a';
+          document.getElementById('cfgToken').value = token;
+          // 自动保存并刷新
+          setTimeout(function(){
+            saveSettings();
+            closeQrModal();
+            loadAccount();
+          }, 1500);
+        } else {
+          document.getElementById('qrStatus').textContent='❌ 登录成功但获取 Token 失败';
+          document.getElementById('qrStatus').style.color='#ff4d4f';
+        }
+        document.getElementById('qrRefreshBtn').style.display='inline-block';
+      } else if(st==='EXPIRED'){
+        clearInterval(qrPollTimer); qrPollTimer=null;
+        document.getElementById('qrStatus').textContent='⏰ 二维码已过期，请重新生成';
+        document.getElementById('qrStatus').style.color='#faad14';
+        document.getElementById('qrRefreshBtn').style.display='inline-block';
+      }
+    }).catch(function(){});
+  }, 2000);
+}
+
+function closeQrModal(){
+  if(qrPollTimer){ clearInterval(qrPollTimer); qrPollTimer=null; }
+  qrCk=''; qrT='';
+  document.getElementById('qrModal').classList.remove('open');
+}
+
 // ─── 账户信息 ──────────────────────────────────────
 function loadAccount(){
   fetch('/api/account').then(function(r){return r.json();}).then(function(d){
@@ -799,7 +926,7 @@ fetch('/api/subscriptions').then(function(r){return r.json();}).then(function(d)
     <b>alisub-ng</b>
   </a>
   <span style="margin:0 10px;color:#ccc">|</span>
-  <span style="color:#aaa">v081511</span>
+  <span style="color:#aaa">v081512</span>
 </div>
 </body>
 </html>

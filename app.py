@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """alisub-ng Web 管理系统"""
 
-import os, sys, json, time, sqlite3, logging, requests, hashlib
+import os, sys, json, time, sqlite3, logging, requests, hashlib, base64
+from urllib.parse import urlencode
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect, url_for
@@ -635,6 +636,90 @@ def api_account():
             "used_bytes": used,
             "total_bytes": total,
         }})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+# ─── 扫码登录 ──────────────────────────────────────
+
+@app.route("/api/qrcode/generate")
+@login_required
+def api_qrcode_generate():
+    """生成阿里云盘扫码登录二维码"""
+    try:
+        resp = requests.post(
+            "https://passport.aliyundrive.com/newlogin/qrcode/generate.do",
+            data="appName=aliyun_drive&fromSite=52",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=15,
+        )
+        data = resp.json()
+        qr_data = data.get("content", {}).get("data", {})
+        content = qr_data.get("codeContent", "")
+        ck = qr_data.get("ck", "")
+        t = qr_data.get("t", 0)
+        if not content or not ck:
+            return jsonify({"code": -1, "msg": "生成二维码失败", "raw": data})
+        return jsonify({"code": 0, "data": {"content": content, "ck": ck, "t": t}})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+@app.route("/api/qrcode/query", methods=["POST"])
+@login_required
+def api_qrcode_query():
+    """查询扫码登录状态"""
+    ck = request.json.get("ck", "")
+    t = request.json.get("t", "")
+    if not ck:
+        return jsonify({"code": -1, "msg": "缺少 ck 参数"})
+    try:
+        resp = requests.post(
+            "https://passport.aliyundrive.com/newlogin/qrcode/query.do",
+            data=urlencode({"ck": ck, "appName": "aliyun_drive", "fromSite": "52", "t": str(t)}),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=15,
+        )
+        data = resp.json()
+        qr_data = data.get("content", {}).get("data", {})
+        status = qr_data.get("qrCodeStatus", "")
+        if status == "CONFIRMED":
+            # 登录成功，从 bizExt 提取 refresh_token
+            biz_ext = qr_data.get("bizExt", "")
+            if biz_ext:
+                try:
+                    decoded = base64.b64decode(biz_ext)
+                    # 尝试多种编码
+                    text = None
+                    for enc in ("utf-8", "gbk", "latin-1"):
+                        try:
+                            text = decoded.decode(enc)
+                            break
+                        except:
+                            continue
+                    if not text:
+                        text = decoded.decode("utf-8", errors="ignore")
+                    biz_data = json.loads(text)
+                    pds = biz_data.get("pds_login_result", {})
+                    refresh_token = pds.get("refreshToken", "")
+                    if refresh_token:
+                        return jsonify({"code": 0, "data": {
+                            "status": "CONFIRMED",
+                            "refresh_token": refresh_token,
+                            "user_name": pds.get("userName", ""),
+                            "nick_name": pds.get("nickName", ""),
+                        }})
+                except Exception as e:
+                    log.error(f"解析 bizExt 失败: {e}")
+            return jsonify({"code": -1, "msg": "登录成功但获取 token 失败"})
+        elif status == "NEW":
+            return jsonify({"code": 0, "data": {"status": "NEW"}})
+        elif status == "SCANED":
+            return jsonify({"code": 0, "data": {"status": "SCANED"}})
+        elif status == "EXPIRED":
+            return jsonify({"code": 0, "data": {"status": "EXPIRED"}})
+        else:
+            return jsonify({"code": 0, "data": {"status": status or "UNKNOWN"}})
     except Exception as e:
         return jsonify({"code": -1, "msg": str(e)})
 

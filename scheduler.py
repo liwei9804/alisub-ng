@@ -52,8 +52,26 @@ class Scheduler:
 
     def _loop(self):
         """主循环"""
+        token_failed = False
         while self.running:
             try:
+                # 先检查 token 是否有效
+                try:
+                    self.api._ensure_token()
+                    token_failed = False
+                except Exception as te:
+                    if not token_failed:
+                        log.error(f"❌ Token 失效: {te}")
+                        if self.notifier:
+                            self.notifier.notify_token_expired()
+                        token_failed = True
+                    # token 失效，跳过本次检查
+                    for _ in range(min(self.check_interval, 300)):
+                        if not self.running:
+                            break
+                        time.sleep(1)
+                    continue
+
                 self.check_all()
             except Exception as e:
                 log.error(f"❌ 检查循环异常: {e}", exc_info=True)

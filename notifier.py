@@ -77,6 +77,16 @@ class Notifier:
         now = datetime.now().strftime("%m-%d %H:%M")
         self.send(f"[{now}] 🗑️ 【{sub_name}】清理了 {count} 个重复文件\n🤖 来自 alisub-ng")
 
+    def notify_token_expired(self):
+        """发送 token 失效通知"""
+        now = datetime.now().strftime("%m-%d %H:%M")
+        self.send(
+            f"[{now}] ⚠️ 阿里云盘 Token 已失效！\n\n"
+            f"请打开 alisub-ng 管理页面，进入「云盘设置」tab，\n"
+            f"点击「📱 扫码获取」重新登录。\n\n"
+            f"🤖 来自 alisub-ng"
+        )
+
     def trigger_strm(self):
         """触发 SmartStrm 任务"""
         if not self.strm_webhook or not self.strm_tasks:
