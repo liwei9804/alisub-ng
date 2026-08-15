@@ -7,7 +7,9 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23667eea'/><text x='50' y='68' font-family='Arial,sans-serif' font-size='48' font-weight='bold' fill='white' text-anchor='middle'>AS</text></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center;background-repeat:no-repeat}
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.15);z-index:0}
+.login-box{position:relative;z-index:1}
 .login-box{background:#fff;border-radius:16px;padding:40px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 .login-box h1{text-align:center;color:#333;margin-bottom:8px;font-size:24px}
 .login-box .sub{text-align:center;color:#999;margin-bottom:32px;font-size:14px}
@@ -37,6 +39,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     </div>
     <button type="submit" class="btn btn-primary">登 录</button>
   </form>
+  <p id="hitokoto" style="text-align:center;color:#aaa;font-size:12px;margin-top:20px;font-style:italic"></p>
 </div>
+<script>
+var img=new Image();
+img.onload=function(){document.body.style.backgroundImage="url('"+img.src+"')";};
+img.src='https://wp.upx8.com/api.php';
+fetch('https://v1.hitokoto.cn/?encode=json').then(function(r){return r.json();}).then(function(d){
+  document.getElementById('hitokoto').textContent='「'+d.hitokoto+'」'+' —— '+d.from;
+}).catch(function(){});
+</script>
 </body>
 </html>
