@@ -121,7 +121,7 @@ class TransferEngine:
                     continue
                 # 目标文件不存在或比源文件小，需要重新转存
                 if dest_file and dest_file.get("size", 0) < share_file_size:
-                    log.info(f"  🔄 E{ep:02d}: 目标文件比源文件小（{dest_file['size']//1024//1024}MB < {share_file_size//1024//1024}MB），重新转存")
+                    log.info(f"  🔄 E{ep:02d}: {expected_name} 目标文件比源文件小（{dest_file['size']//1024//1024}MB < {share_file_size//1024//1024}MB），重新转存")
                     try:
                         self.api.delete_file(dest_file["file_id"])
                         log.info(f"  🗑️ 已删除: {expected_name}")
@@ -130,7 +130,7 @@ class TransferEngine:
                     except Exception as e:
                         log.warning(f"  ⚠️ 删除失败: {e}")
                         continue
-                    sf["reason"] = f"画质升级: {dest_file['size']//1024//1024}MB → {share_file_size//1024//1024}MB"
+                    sf["reason"] = f"{dest_file['size']//1024//1024}MB → {share_file_size//1024//1024}MB（4K版本替换）"
                 elif not dest_file:
                     # 目标文件不存在，检查同集数文件
                     if ep in dest_episodes:
@@ -147,9 +147,29 @@ class TransferEngine:
                                 log.warning(f"  ⚠️ 删除失败: {e}")
                                 continue
                             del dest_episodes[ep]
-                            sf["reason"] = f"画质升级: {existing_size//1024//1024}MB → {share_file_size//1024//1024}MB"
+                            sf["reason"] = f"{existing_size//1024//1024}MB → {share_file_size//1024//1024}MB（4K版本替换）"
                         else:
                             continue
+
+            # 数据库未命中时，检查目标目录是否已有同集数文件（防止分享ID变化导致重复转存）
+            if ep in dest_episodes:
+                existing_dest = dest_episodes[ep]
+                existing_size = existing_dest.get("size", 0)
+                if share_file_size > existing_size:
+                    log.info(f"  🔄 E{ep:02d}: 目标文件较小（{existing_size//1024//1024}MB < {share_file_size//1024//1024}MB），替换 {existing_dest['name']}")
+                    try:
+                        self.api.delete_file(existing_dest["file_id"])
+                        log.info(f"  🗑️ 已删除: {existing_dest['name']}")
+                        dest_files.pop(existing_dest["name"], None)
+                        time.sleep(1)
+                    except Exception as e:
+                        log.warning(f"  ⚠️ 删除失败: {e}")
+                        continue
+                    del dest_episodes[ep]
+                    sf["reason"] = f"{existing_size//1024//1024}MB → {share_file_size//1024//1024}MB（小转大）"
+                else:
+                    log.info(f"  ⏭️ E{ep:02d}: 目标已有同集数文件 {existing_dest['name']}（{existing_size//1024//1024}MB ≥ {share_file_size//1024//1024}MB），跳过")
+                    continue
 
             # 同批同集数去重：优先保留 V2 版本，其次保留无括号后缀的
             if ep in batch_episodes:

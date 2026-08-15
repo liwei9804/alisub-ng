@@ -53,12 +53,15 @@ class Notifier:
             f" 📋文件：",
         ]
         for i, t in enumerate(transfers, 1):
-            reason = t.get("reason")
-            if reason:
-                lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}（{reason}）")
-            else:
-                lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}")
+            lines.append(f"{i}. {t['share_file_name']} → {t['to_file_name']}")
         lines.append(f" ✅状态: success")
+
+        # 画质升级原因
+        upgrades = [t for t in transfers if t.get("reason")]
+        if upgrades:
+            lines.append(" 📈画质升级:")
+            for t in upgrades:
+                lines.append(f"   {t['to_file_name']}: {t['reason']}")
 
         self.send("\n".join(lines))
 
