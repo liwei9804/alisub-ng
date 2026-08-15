@@ -763,3 +763,4 @@ if __name__ == "__main__":
         log.warning(f"⚠️ 调度器自动启动失败: {e}")
     log.info(f"🚀 alisub-ng Web 启动 - 端口 {PORT}")
     app.run(host="0.0.0.0", port=PORT, debug=False)
+# build trigger
