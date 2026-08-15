@@ -33,5 +33,3 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/alisub-ng:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
