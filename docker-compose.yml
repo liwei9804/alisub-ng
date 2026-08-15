@@ -1,6 +1,6 @@
 services:
   alisub-ng:
-    image: 2063335995/alisub-ng:latest
+    image: ghcr.io/liwei9804/alisub-ng:latest
     container_name: alisub-ng
     restart: unless-stopped
     ports:
