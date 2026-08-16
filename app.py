@@ -145,7 +145,7 @@ def alisub_list_subscriptions():
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT id, share_title, share_url, share_pwd, to_parent_id,
-               to_file_name, status, last_file_name, last_file_no, check_days, created_at
+               to_file_name, status, last_file_name, last_file_no, check_days, upgrade_quality, created_at
         FROM ali_subscribe ORDER BY id
     """).fetchall()
     conn.close()
@@ -238,8 +238,8 @@ def api_create_sub():
             share_id = share_url.split("#")[1].split("?")[0].split("/")[0]
         
         conn.execute("""
-            INSERT INTO ali_subscribe (share_title, share_url, share_id, parent_file_id, to_parent_id, to_file_name, status, check_days, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            INSERT INTO ali_subscribe (share_title, share_url, share_id, parent_file_id, to_parent_id, to_file_name, status, check_days, upgrade_quality, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         """, (
             data.get("name", ""),
             share_url,
@@ -249,6 +249,7 @@ def api_create_sub():
             data.get("to_file_name", "S01E"),
             str(data.get("status", 1)),
             data.get("check_days", ""),
+            1 if data.get("upgrade_quality") else 0,
         ))
         conn.commit()
         conn.close()
@@ -278,6 +279,8 @@ def api_update_sub(sub_id):
             updates.append("last_file_no=?"); vals.append(int(data["last_file_no"]))
         if "check_days" in data:
             updates.append("check_days=?"); vals.append(data["check_days"])
+        if "upgrade_quality" in data:
+            updates.append("upgrade_quality=?"); vals.append(1 if data["upgrade_quality"] else 0)
         if updates:
             vals.append(sub_id)
             conn.execute(f"UPDATE ali_subscribe SET {','.join(updates)} WHERE id=?", vals)

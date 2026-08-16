@@ -221,6 +221,13 @@ tr:hover{background:#f9f9ff}
       </div>
       <div style="font-size:11px;color:#aaa;margin-top:4px">选择一集后，只转存该集之后的更新</div>
     </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="editUpgradeQuality" style="width:16px;height:16px;cursor:pointer">
+        <span>🎨 画质升级（同集数文件较大时自动替换）</span>
+      </label>
+      <div style="font-size:11px;color:#aaa;margin-top:4px;margin-left:24px">启用后，如果源盘有更大版本的同集文件，会删除旧的转存新的</div>
+    </div>
     <div style="text-align:right;margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-success" onclick="manualSubscribe()">📥 手动订阅</button>
       <button class="btn btn-outline" onclick="closeModal('editModal')">取消</button>
@@ -378,6 +385,7 @@ function openAddSub(){
   document.getElementById('editStatus').value='1';
   document.getElementById('editEndFileNo').value='';
   setSelectedDays('');
+  document.getElementById('editUpgradeQuality').checked = false;
   document.querySelector('#editModal h3').textContent='➕ 新增订阅';
   document.getElementById('editModal').classList.add('open');
 }
@@ -396,6 +404,7 @@ function openEdit(id){
   document.getElementById('editStatus').value = s.status || 1;
   document.getElementById('editEndFileNo').value = s.last_file_no || '';
   setSelectedDays(s.check_days || '');
+  document.getElementById('editUpgradeQuality').checked = !!s.upgrade_quality;
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -408,7 +417,8 @@ function saveEdit(){
     to_file_name: document.getElementById('editFileName').value,
     status: parseInt(document.getElementById('editStatus').value),
     last_file_no: parseInt(document.getElementById('editEndFileNo').value) || 0,
-    check_days: getSelectedDays()
+    check_days: getSelectedDays(),
+    upgrade_quality: document.getElementById('editUpgradeQuality').checked
   };
   var url = id ? '/api/subscriptions/'+id : '/api/subscriptions';
   var method = id ? 'PUT' : 'POST';

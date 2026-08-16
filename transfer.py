@@ -97,6 +97,7 @@ class TransferEngine:
 
         # 4. 找出需要转存的新文件（同一集只保留最佳版本）
         to_transfer = []
+        upgrade_quality = bool(sub.get("upgrade_quality", 0))
         batch_episodes = {}  # episode → item，用于同批去重
         for sf in media_files:
             share_file_id = sf["file_id"]
@@ -112,16 +113,15 @@ class TransferEngine:
             # 计算目标文件名
             expected_name = self._format_name(to_file_name_tpl, name, ep, share_file_name)
 
-            # 已转存过（通过数据库记录）— 但仍需检查目标目录实际文件
+            # ── 默认模式：转过就跳过，不比较大小 ──
             if share_file_id in existing_share_ids:
-                # 检查目标目录是否真有这个文件
+                if not upgrade_quality:
+                    continue
+                # 画质升级模式：检查目标目录实际文件
                 dest_file = dest_files.get(expected_name)
                 if dest_file and dest_file.get("size", 0) >= share_file_size:
-                    # 目标文件存在且大小正常，真正跳过
                     continue
-                # 目标文件不存在或比源文件小，需要重新转存
                 if dest_file and dest_file.get("size", 0) < share_file_size:
-                    # 如果该文件已成功转存过，但目标仍比源小，说明源文件无法完整转存，永久跳过
                     if self._has_transferred_before(sub.get("id", 0), share_file_id):
                         log.info(f"  ⏭️ E{ep:02d}: {expected_name} 已转存过但目标仍较小（{dest_file['size']//1024//1024}MB < {share_file_size//1024//1024}MB），跳过")
                         continue
@@ -130,14 +130,13 @@ class TransferEngine:
                         self.api.delete_file(dest_file["file_id"])
                         log.info(f"  🗑️ 已删除: {expected_name}")
                         dest_files.pop(expected_name, None)
-                        dest_episodes.pop(ep, None)  # 同步清理，防止二次删除
+                        dest_episodes.pop(ep, None)
                         time.sleep(1)
                     except Exception as e:
                         log.warning(f"  ⚠️ 删除失败: {e}")
                         continue
                     sf["reason"] = f"{dest_file['size']//1024//1024}MB → {share_file_size//1024//1024}MB（4K版本替换）"
                 elif not dest_file:
-                    # 目标文件不存在，检查同集数文件
                     if ep in dest_episodes:
                         existing_dest = dest_episodes[ep]
                         existing_size = existing_dest.get("size", 0)
@@ -156,8 +155,8 @@ class TransferEngine:
                         else:
                             continue
 
-            # 数据库未命中时，检查目标目录是否已有同集数文件（防止分享ID变化导致重复转存）
-            if ep in dest_episodes:
+            # ── 画质升级模式：数据库未命中时，检查目标目录同集数文件 ──
+            if upgrade_quality and ep in dest_episodes:
                 existing_dest = dest_episodes[ep]
                 existing_size = existing_dest.get("size", 0)
                 if share_file_size > existing_size:
@@ -181,7 +180,7 @@ class TransferEngine:
                     log.info(f"  ⏭️ E{ep:02d}: 目标已有同集数文件 {existing_dest['name']}（{existing_size//1024//1024}MB ≥ {share_file_size//1024//1024}MB），跳过")
                     continue
 
-            # 同批同集数去重：优先保留 V2 版本，其次保留无括号后缀的
+            # ── 同批同集数去重（永远生效）：优先保留 V2 版本，其次保留无括号后缀的 ──
             if ep in batch_episodes:
                 existing = batch_episodes[ep]
                 if self._is_better_version(share_file_name, existing["share_file_name"]):
