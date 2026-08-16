@@ -210,15 +210,15 @@ class Scheduler:
         except:
             return None
 
-    def _save_record(self, sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error):
+    def _save_record(self, sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error, to_file_size=0):
         """保存转存记录到数据库"""
         try:
             conn = sqlite3.connect(ALISUB_DB)
             conn.execute("""
                 INSERT INTO ali_record (subscribe_id, share_file_id, share_file_name,
-                                        to_file_id, to_file_name, created_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'))
-            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name))
+                                        to_file_id, to_file_name, to_file_size, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, to_file_size, status))
             conn.commit()
             conn.close()
         except Exception as e:

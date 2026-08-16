@@ -121,11 +121,16 @@ class TransferEngine:
                     continue
                 # 目标文件不存在或比源文件小，需要重新转存
                 if dest_file and dest_file.get("size", 0) < share_file_size:
+                    # 如果该文件已成功转存过，但目标仍比源小，说明源文件无法完整转存，永久跳过
+                    if self._has_transferred_before(sub.get("id", 0), share_file_id):
+                        log.info(f"  ⏭️ E{ep:02d}: {expected_name} 已转存过但目标仍较小（{dest_file['size']//1024//1024}MB < {share_file_size//1024//1024}MB），跳过")
+                        continue
                     log.info(f"  🔄 E{ep:02d}: {expected_name} 目标文件比源文件小（{dest_file['size']//1024//1024}MB < {share_file_size//1024//1024}MB），重新转存")
                     try:
                         self.api.delete_file(dest_file["file_id"])
                         log.info(f"  🗑️ 已删除: {expected_name}")
                         dest_files.pop(expected_name, None)
+                        dest_episodes.pop(ep, None)  # 同步清理，防止二次删除
                         time.sleep(1)
                     except Exception as e:
                         log.warning(f"  ⚠️ 删除失败: {e}")
@@ -163,8 +168,13 @@ class TransferEngine:
                         dest_files.pop(existing_dest["name"], None)
                         time.sleep(1)
                     except Exception as e:
-                        log.warning(f"  ⚠️ 删除失败: {e}")
-                        continue
+                        err_str = str(e)
+                        if "recycle bin" in err_str or "OperationNotSupport" in err_str:
+                            log.info(f"  ℹ️ 文件已在回收站，跳过删除: {existing_dest['name']}")
+                            dest_files.pop(existing_dest["name"], None)
+                        else:
+                            log.warning(f"  ⚠️ 删除失败: {e}")
+                            continue
                     del dest_episodes[ep]
                     sf["reason"] = f"{existing_size//1024//1024}MB → {share_file_size//1024//1024}MB（小转大）"
                 else:
@@ -179,6 +189,7 @@ class TransferEngine:
                     batch_episodes[ep] = {
                         "share_file_id": share_file_id,
                         "share_file_name": share_file_name,
+                        "share_file_size": share_file_size,
                         "episode": ep,
                         "expected_name": expected_name,
                         "reason": sf.get("reason", ""),
@@ -190,6 +201,7 @@ class TransferEngine:
             batch_episodes[ep] = {
                 "share_file_id": share_file_id,
                 "share_file_name": share_file_name,
+                "share_file_size": share_file_size,
                 "episode": ep,
                 "expected_name": expected_name,
                 "reason": sf.get("reason", ""),
@@ -232,6 +244,7 @@ class TransferEngine:
         """转存单个文件"""
         share_file_id = item["share_file_id"]
         share_file_name = item["share_file_name"]
+        share_file_size = item.get("share_file_size", 0)
         ep = item["episode"]
         expected_name = item["expected_name"]
 
@@ -259,9 +272,18 @@ class TransferEngine:
             else:
                 final_name = expected_name
 
+            # 获取实际目标文件大小（转存后可能比源文件小）
+            actual_dest_size = share_file_size
+            if to_file_id:
+                try:
+                    dest_info = self.api.get_file(to_file_id)
+                    actual_dest_size = dest_info.get("size", share_file_size)
+                except:
+                    pass
+
             # 记录到数据库
             if record_callback:
-                record_callback(sub_id, share_file_id, share_file_name, to_file_id, final_name, "done", "")
+                record_callback(sub_id, share_file_id, share_file_name, to_file_id, final_name, "done", "", actual_dest_size)
 
             log.info(f"  ✅ 转存成功: {final_name}")
             result_item = {
@@ -279,7 +301,7 @@ class TransferEngine:
             error_msg = str(e)
             log.error(f"  ❌ 转存失败: {error_msg}")
             if record_callback:
-                record_callback(sub_id, share_file_id, share_file_name, "", "", "failed", error_msg)
+                record_callback(sub_id, share_file_id, share_file_name, "", "", "failed", error_msg, 0)
             return None
 
     def _verify_and_rename(self, file_id: str, expected_name: str, retries: int = 3) -> str:
@@ -345,6 +367,21 @@ class TransferEngine:
         if deleted:
             log.info(f"  ✅ [{title}] 去重清理 {deleted} 个文件")
         return deleted
+
+    def _has_transferred_before(self, sub_id: int, share_file_id: str) -> bool:
+        """检查某文件是否已成功转存过"""
+        import sqlite3
+        db_path = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
+        try:
+            conn = sqlite3.connect(db_path)
+            row = conn.execute(
+                "SELECT COUNT(*) FROM ali_record WHERE subscribe_id=? AND share_file_id=? AND status='done'",
+                (sub_id, share_file_id)
+            ).fetchone()
+            conn.close()
+            return row[0] > 0 if row else False
+        except:
+            return False
 
     @staticmethod
     def _is_better_version(new_name: str, existing_name: str) -> bool:
