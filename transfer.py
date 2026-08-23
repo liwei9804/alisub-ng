@@ -154,6 +154,12 @@ class TransferEngine:
                             sf["reason"] = f"{existing_size//1024//1024}MB → {share_file_size//1024//1024}MB（4K版本替换）"
                         else:
                             continue
+            else:
+                # ── 新文件 ID：检查目标目录是否已有该集（任意格式） ──
+                if not upgrade_quality and ep in dest_episodes:
+                    existing_dest = dest_episodes[ep]
+                    log.info(f"  ⏭️ E{ep:02d}: 目标已有 {existing_dest['name']}，跳过 {share_file_name}")
+                    continue
 
             # ── 画质升级模式：数据库未命中时，检查目标目录同集数文件 ──
             if upgrade_quality and ep in dest_episodes:
