@@ -447,7 +447,7 @@ def api_save_settings():
         current["openlist_token"] = data["openlist_token"]
     if "openlist_storage_id" in data:
         current["openlist_storage_id"] = int(data["openlist_storage_id"])
-    # drive_id 为空时自动从 token 获取
+    # drive_id 为空时自动从 token 获取资源盘 ID
     if not current.get("drive_id") and current.get("token"):
         try:
             resp = requests.post("https://auth.aliyundrive.com/v2/account/token", json={
@@ -455,8 +455,8 @@ def api_save_settings():
                 "refresh_token": current["token"]
             }, timeout=15)
             td = resp.json()
-            if td.get("default_drive_id"):
-                current["drive_id"] = td["default_drive_id"]
+            # 优先用资源盘 ID，其次用默认盘 ID
+            current["drive_id"] = td.get("resource_drive_id") or td.get("default_drive_id", "")
         except:
             pass
     save_settings(current)
@@ -517,9 +517,9 @@ def api_drives():
                 })
         except:
             pass
-        # 资源盘（默认 drive_name=resource）
-        resource_drive_id = s.get("drive_id", "")
-        if resource_drive_id != default_drive_id:
+        # 资源盘（从 token 响应获取，或从 settings 读取）
+        resource_drive_id = td.get("resource_drive_id", "") or s.get("drive_id", "")
+        if resource_drive_id and resource_drive_id != default_drive_id:
             try:
                 r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": resource_drive_id}, headers=headers, timeout=15)
                 d2 = r2.json()
