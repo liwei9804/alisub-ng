@@ -447,18 +447,8 @@ def api_save_settings():
         current["openlist_token"] = data["openlist_token"]
     if "openlist_storage_id" in data:
         current["openlist_storage_id"] = int(data["openlist_storage_id"])
-    # drive_id 为空时自动从 token 获取资源盘 ID
-    if not current.get("drive_id") and current.get("token"):
-        try:
-            resp = requests.post("https://auth.aliyundrive.com/v2/account/token", json={
-                "grant_type": "refresh_token",
-                "refresh_token": current["token"]
-            }, timeout=15)
-            td = resp.json()
-            # 优先用资源盘 ID，其次用默认盘 ID
-            current["drive_id"] = td.get("resource_drive_id") or td.get("default_drive_id", "")
-        except:
-            pass
+    # drive_id 为空时，不自动填充（阿里云盘 API 不返回资源盘 ID，需用户手动选择）
+    # 只在 token 无效时做校验
     save_settings(current)
     # 重置 API 缓存，让新 token 生效
     global api, scheduler
@@ -504,6 +494,7 @@ def api_drives():
         default_drive_id = td.get("default_drive_id", "")
         headers = {"Authorization": f"Bearer {access_token}"}
         drives = []
+        seen = set()
         # 备份盘
         try:
             r1 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": default_drive_id}, headers=headers, timeout=15)
@@ -515,13 +506,19 @@ def api_drives():
                     "used_size": d1.get("used_size", 0),
                     "total_size": d1.get("total_size", 0),
                 })
+                seen.add(d1["drive_id"])
         except:
             pass
-        # 资源盘（从 token 响应获取，或从 settings 读取）
-        resource_drive_id = td.get("resource_drive_id", "") or s.get("drive_id", "")
-        if resource_drive_id and resource_drive_id != default_drive_id:
+        # 资源盘：优先用 settings 里用户选择的 drive_id
+        candidate_ids = []
+        if s.get("drive_id") and s["drive_id"] not in seen:
+            candidate_ids.append(s["drive_id"])
+        # 也试试 token 里的 resource_drive_id
+        if td.get("resource_drive_id") and td["resource_drive_id"] not in seen:
+            candidate_ids.append(td["resource_drive_id"])
+        for rid in candidate_ids:
             try:
-                r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": resource_drive_id}, headers=headers, timeout=15)
+                r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": rid}, headers=headers, timeout=15)
                 d2 = r2.json()
                 if "drive_id" in d2:
                     drives.append({
@@ -530,6 +527,7 @@ def api_drives():
                         "used_size": d2.get("used_size", 0),
                         "total_size": d2.get("total_size", 0),
                     })
+                    break
             except:
                 pass
         return jsonify({"code": 0, "data": drives})
