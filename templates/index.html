@@ -879,9 +879,9 @@ function pollQrStatus(){
           document.getElementById('qrStatus').textContent='✅ 登录成功！已自动填入 Token';
           document.getElementById('qrStatus').style.color='#52c41a';
           document.getElementById('cfgToken').value = token;
-          // 自动保存并刷新
+          // 先刷新盘列表（不带selectedId，让用户看到所有盘），再保存
           setTimeout(function(){
-            saveSettings();
+            loadDrives();
             closeQrModal();
             loadAccount();
           }, 1500);
