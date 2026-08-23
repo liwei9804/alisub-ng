@@ -39,6 +39,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./settings.json:/app/settings.json
     environment:
       - TZ=Asia/Shanghai
       - PORT=8003
