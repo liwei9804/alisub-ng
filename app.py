@@ -34,7 +34,7 @@ PORT = int(os.environ.get("PORT", "8003"))
 
 # ─── 云盘设置 ──────────────────────────────────────
 
-SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "data", "settings.json")
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.json")
 
 
 def load_settings():

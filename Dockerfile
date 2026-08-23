@@ -11,7 +11,7 @@ COPY . .
 RUN mkdir -p /app/data /app/logs
 
 # 内置默认配置
-RUN echo '{"token":"","drive_id":"","webhook":"","interval":3600,"strm_webhook":"","strm_tasks":"","openlist_url":"","openlist_token":"","openlist_storage_id":0}' > /app/data/settings.json
+RUN echo '{"token":"","drive_id":"","webhook":"","interval":3600,"strm_webhook":"","strm_tasks":"","openlist_url":"","openlist_token":"","openlist_storage_id":0}' > /app/settings.json
 
 # 初始化数据库
 RUN python3 -c "import models; models.init_db()"
