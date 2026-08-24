@@ -477,6 +477,78 @@ def api_test_settings():
         return jsonify({"code": -1, "msg": str(e)})
 
 
+# ─── 备份导出/导入 ──────────────────────────────────────
+
+@app.route("/api/backup/export")
+@login_required
+def api_backup_export():
+    """导出所有配置和订阅数据"""
+    import json, io, csv
+    from datetime import datetime
+    s = load_settings()
+    # 读取订阅数据
+    conn = sqlite3.connect(ALISUB_DB)
+    conn.row_factory = sqlite3.Row
+    subs = [dict(row) for row in conn.execute("SELECT * FROM ali_subscribe ORDER BY id").fetchall()]
+    records = [dict(row) for row in conn.execute("SELECT * FROM ali_record ORDER BY id").fetchall()]
+    config = {row["key"]: row["value"] for row in conn.execute("SELECT * FROM alisub_config").fetchall()}
+    conn.close()
+    backup = {
+        "version": "alisub-ng",
+        "exported_at": datetime.now().isoformat(),
+        "settings": s,
+        "subscriptions": subs,
+        "records": records,
+        "config": config,
+    }
+    return jsonify({"code": 0, "data": backup})
+
+
+@app.route("/api/backup/import", methods=["POST"])
+@login_required
+def api_backup_import():
+    """导入备份数据"""
+    data = request.json
+    if not data or data.get("version") != "alisub-ng":
+        return jsonify({"code": -1, "msg": "无效的备份文件"})
+    # 恢复 settings.json
+    settings = data.get("settings", {})
+    if settings:
+        save_settings(settings)
+    # 恢复数据库
+    conn = sqlite3.connect(ALISUB_DB)
+    try:
+        # 导入订阅
+        subs = data.get("subscriptions", [])
+        if subs:
+            conn.execute("DELETE FROM ali_subscribe")
+            for sub in subs:
+                cols = ", ".join(sub.keys())
+                placeholders = ", ".join(["?"] * len(sub))
+                conn.execute(f"INSERT INTO ali_subscribe ({cols}) VALUES ({placeholders})", list(sub.values()))
+        # 导入转存记录
+        records = data.get("records", [])
+        if records:
+            conn.execute("DELETE FROM ali_record")
+            for rec in records:
+                cols = ", ".join(rec.keys())
+                placeholders = ", ".join(["?"] * len(rec))
+                conn.execute(f"INSERT INTO ali_record ({cols}) VALUES ({placeholders})", list(rec.values()))
+        # 导入配置
+        config = data.get("config", {})
+        if config:
+            conn.execute("DELETE FROM alisub_config")
+            for k, v in config.items():
+                conn.execute("INSERT INTO alisub_config (key, value) VALUES (?, ?)", (k, v))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"code": -1, "msg": f"导入失败: {str(e)}"})
+    finally:
+        conn.close()
+    return jsonify({"code": 0, "msg": f"导入成功：{len(subs)} 个订阅，{len(records)} 条记录"})
+
+
 @app.route("/api/drives")
 @login_required
 def api_drives():
@@ -509,13 +581,20 @@ def api_drives():
                 seen.add(d1["drive_id"])
         except:
             pass
-        # 资源盘：优先用 settings 里用户选择的 drive_id
+        # 资源盘：收集所有可能的资源盘 ID
         candidate_ids = []
         if s.get("drive_id") and s["drive_id"] not in seen:
             candidate_ids.append(s["drive_id"])
-        # 也试试 token 里的 resource_drive_id
         if td.get("resource_drive_id") and td["resource_drive_id"] not in seen:
             candidate_ids.append(td["resource_drive_id"])
+        # 补充：直接尝试所有 drive_id（除了已添加的备份盘）
+        for did in td.get("drive_ids", []):
+            if did not in seen and did not in candidate_ids:
+                candidate_ids.append(did)
+        # 如果还是没找到，直接用已知的资源盘 ID 试一下
+        KNOWN_RESOURCE_DRIVE = "840490182"
+        if KNOWN_RESOURCE_DRIVE not in seen and KNOWN_RESOURCE_DRIVE not in candidate_ids:
+            candidate_ids.append(KNOWN_RESOURCE_DRIVE)
         for rid in candidate_ids:
             try:
                 r2 = requests.post("https://api.aliyundrive.com/v2/drive/get", json={"drive_id": rid}, headers=headers, timeout=15)
