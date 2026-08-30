@@ -9,6 +9,7 @@ import time
 import sqlite3
 import logging
 import threading
+import requests
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -53,18 +54,54 @@ class Scheduler:
     def _loop(self):
         """主循环"""
         token_failed = False
+        token_fail_start = None  # 记录token首次失效的时间
+        TOKEN_FAIL_THRESHOLD = 3 * 3600  # 3小时（秒）
+        network_fail_count = 0
+        NETWORK_FAIL_THRESHOLD = 3  # 连续网络失败 N 次才通知
         while self.running:
             try:
                 # 先检查 token 是否有效
                 try:
                     self.api._ensure_token()
+                    # token 恢复正常，重置状态
+                    if token_failed:
+                        log.info("✅ Token 已恢复正常")
                     token_failed = False
-                except Exception as te:
-                    if not token_failed:
-                        log.error(f"❌ Token 失效: {te}")
+                    token_fail_start = None
+                    network_fail_count = 0
+                except requests.exceptions.ConnectionError as ce:
+                    # 网络不可达 / 连接失败 — 不立即通知，累计计数
+                    network_fail_count += 1
+                    log.warning(f"⚠️ Token 刷新网络异常（{network_fail_count}/{NETWORK_FAIL_THRESHOLD}）: {ce}")
+                    if network_fail_count >= NETWORK_FAIL_THRESHOLD and not token_failed:
+                        log.error(f"❌ 连续 {NETWORK_FAIL_THRESHOLD} 次网络异常，可能网络中断")
                         if self.notifier:
-                            self.notifier.notify_token_expired()
+                            self.notifier.notify_network_error(str(ce))
                         token_failed = True
+                    for _ in range(min(self.check_interval, 300)):
+                        if not self.running:
+                            break
+                        time.sleep(1)
+                    continue
+                except Exception as te:
+                    # 非网络错误（如 token 真过期、API 返回认证失败）
+                    now = time.time()
+                    if not token_fail_start:
+                        # 首次失效，记录时间
+                        token_fail_start = now
+                        log.warning(f"⚠️ Token 首次失效，开始计时: {te}")
+                    elif now - token_fail_start >= TOKEN_FAIL_THRESHOLD:
+                        # 已连续失效超过3小时，发送通知
+                        if not token_failed:
+                            log.error(f"❌ Token 已连续失效超过3小时，发送通知")
+                            if self.notifier:
+                                self.notifier.notify_token_expired()
+                            token_failed = True
+                    else:
+                        # 还在等待期间，记录日志
+                        elapsed = int(now - token_fail_start)
+                        remaining = TOKEN_FAIL_THRESHOLD - elapsed
+                        log.warning(f"⚠️ Token 失效中（已持续 {elapsed}s，还需 {remaining}s 才通知）: {te}")
                     # token 失效，跳过本次检查
                     for _ in range(min(self.check_interval, 300)):
                         if not self.running:

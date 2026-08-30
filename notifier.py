@@ -87,6 +87,17 @@ class Notifier:
             f"🤖 来自 alisub-ng"
         )
 
+    def notify_network_error(self, error: str):
+        """发送网络异常通知（连续多次失败才触发）"""
+        now = datetime.now().strftime("%m-%d %H:%M")
+        self.send(
+            f"[{now}] 🌐 阿里云盘网络连接异常\n\n"
+            f"连续多次无法连接阿里云盘服务器，可能是网络波动或 DNS 问题。\n"
+            f"Token 本身可能没问题，等网络恢复后会自动继续。\n\n"
+            f"错误: {error}\n\n"
+            f"🤖 来自 alisub-ng"
+        )
+
     def trigger_strm(self):
         """触发 SmartStrm 任务"""
         if not self.strm_webhook or not self.strm_tasks:
