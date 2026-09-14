@@ -75,9 +75,11 @@ class TransferEngine:
 
         log.info(f"  分享目录有 {len(media_files)} 个媒体文件")
 
-        # 2. 检查哪些已转存（通过 alisub 数据库 ali_record）
+        # 2. 检查哪些已转存（通过 alisub-ng 自身数据库 records）
         existing_share_ids = self._get_existing_share_ids(sub.get("id", 0))
-        log.info(f"  已转存 {len(existing_share_ids)} 个")
+        log.info(f"  已转存记录 {len(existing_share_ids)} 条（来自 records 表）")
+        if existing_share_ids:
+            log.debug(f"  已转存 share_file_id 列表: {list(existing_share_ids)[:10]}...")
 
         # 3. 获取目标目录现有文件（用于去重判断）
         dest_files = {}
@@ -116,6 +118,7 @@ class TransferEngine:
             # ── 默认模式：转过就跳过，不比较大小 ──
             if share_file_id in existing_share_ids:
                 if not upgrade_quality:
+                    log.info(f"  ⏭️ E{ep:02d}: {share_file_name} 已在 records 中，跳过")
                     continue
                 # 画质升级模式：检查目标目录实际文件
                 dest_file = dest_files.get(expected_name)
@@ -374,13 +377,13 @@ class TransferEngine:
         return deleted
 
     def _has_transferred_before(self, sub_id: int, share_file_id: str) -> bool:
-        """检查某文件是否已成功转存过"""
+        """检查某文件是否已成功转存过（从 alisub-ng 自身 records 表查询）"""
         import sqlite3
-        db_path = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
         try:
             conn = sqlite3.connect(db_path)
             row = conn.execute(
-                "SELECT COUNT(*) FROM ali_record WHERE subscribe_id=? AND share_file_id=? AND status='done'",
+                "SELECT COUNT(*) FROM records WHERE subscribe_id=? AND share_file_id=? AND status='done'",
                 (sub_id, share_file_id)
             ).fetchone()
             conn.close()
@@ -418,13 +421,13 @@ class TransferEngine:
         return f"{title} - S01E{episode}{ext}"
 
     def _get_existing_share_ids(self, sub_id: int) -> set:
-        """从 alisub 数据库获取已转存的 share_file_id 集合"""
+        """从 alisub-ng 自身数据库获取已转存的 share_file_id 集合"""
         import sqlite3
-        db_path = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
         try:
             conn = sqlite3.connect(db_path)
             rows = conn.execute(
-                "SELECT share_file_id FROM ali_record WHERE subscribe_id=?",
+                "SELECT share_file_id FROM records WHERE subscribe_id=? AND status='done'",
                 (sub_id,)
             ).fetchall()
             conn.close()

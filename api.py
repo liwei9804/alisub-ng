@@ -4,10 +4,31 @@
 """
 
 import time
+import socket
 import logging
 import requests
 from typing import Optional
 
+# 全局强制 IPv4：monkey-patch urllib3 的 create_connection，
+# 避免 IPv6 不通导致 Max retries exceeded 错误
+import urllib3.util.connection as _urllib3_conn
+_original_create_connection = _urllib3_conn.create_connection
+
+def _ipv4_create_connection(address, *args, **kwargs):
+    host, port = address
+    for res in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+        af, socktype, proto, canonname, sa = res
+        sock = None
+        try:
+            sock = socket.socket(af, socktype, proto)
+            return sock
+        except OSError:
+            if sock:
+                sock.close()
+    # 回退到原始方法
+    return _original_create_connection(address, *args, **kwargs)
+
+_urllib3_conn.create_connection = _ipv4_create_connection
 log = logging.getLogger("alisub-ng.api")
 
 
