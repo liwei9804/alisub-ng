@@ -19,7 +19,7 @@ from notifier import Notifier
 
 log = logging.getLogger("alisub-ng.scheduler")
 
-ALISUB_DB = os.path.join(os.path.dirname(__file__), "data", "alisub-ng.db")
+ALISUB_DB = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
 
 
 class Scheduler:
@@ -247,15 +247,28 @@ class Scheduler:
         except:
             return None
 
-    def _save_record(self, sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error, to_file_size=0):
-        """保存转存记录到数据库"""
+    def _save_record(self, sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error, to_file_size=0, episode_num=0):
+        """保存转存记录到 records 表（与 models.py / transfer.py 共用）"""
         try:
             conn = sqlite3.connect(ALISUB_DB)
+            # 确保 records 表存在（兼容旧库）
+            conn.execute("""CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscribe_id INTEGER NOT NULL,
+                share_file_id TEXT NOT NULL,
+                share_file_name TEXT NOT NULL,
+                to_file_id TEXT DEFAULT '',
+                to_file_name TEXT DEFAULT '',
+                episode_num INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                error_msg TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            )""")
             conn.execute("""
-                INSERT INTO ali_record (subscribe_id, share_file_id, share_file_name,
-                                        to_file_id, to_file_name, to_file_size, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, to_file_size, status))
+                INSERT INTO records (subscribe_id, share_file_id, share_file_name,
+                                    to_file_id, to_file_name, episode_num, status, error_msg)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, episode_num, status, error))
             conn.commit()
             conn.close()
         except Exception as e:

@@ -35,7 +35,7 @@ class TransferEngine:
 
         Args:
             sub: 订阅配置字典
-            record_callback: 回调函数 (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error)
+            record_callback: 回调函数 (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error, to_file_size, episode_num)
 
         Returns:
             转存成功的列表 [{"share_file_name", "to_file_name", "episode"}]
@@ -77,9 +77,12 @@ class TransferEngine:
 
         # 2. 检查哪些已转存（通过 alisub-ng 自身数据库 records）
         existing_share_ids = self._get_existing_share_ids(sub.get("id", 0))
-        log.info(f"  已转存记录 {len(existing_share_ids)} 条（来自 records 表）")
+        existing_episodes = self._get_existing_episodes(sub.get("id", 0))
+        log.info(f"  已转存记录 {len(existing_share_ids)} 条（share_file_id），{len(existing_episodes)} 集（episode_num）")
         if existing_share_ids:
             log.debug(f"  已转存 share_file_id 列表: {list(existing_share_ids)[:10]}...")
+        if existing_episodes:
+            log.debug(f"  已转存集数: {sorted(existing_episodes)}")
 
         # 3. 获取目标目录现有文件（用于去重判断）
         dest_files = {}
@@ -162,6 +165,10 @@ class TransferEngine:
                 if not upgrade_quality and ep in dest_episodes:
                     existing_dest = dest_episodes[ep]
                     log.info(f"  ⏭️ E{ep:02d}: 目标已有 {existing_dest['name']}，跳过 {share_file_name}")
+                    continue
+                # ── 分享源重新上传时 ID 全变，用集数兜底 ──
+                if ep in existing_episodes:
+                    log.info(f"  ⏭️ E{ep:02d}: 数据库已有该集记录（share_file_id 变了但集数 {ep} 已转存），跳过 {share_file_name}")
                     continue
 
             # ── 画质升级模式：数据库未命中时，检查目标目录同集数文件 ──
@@ -291,7 +298,7 @@ class TransferEngine:
 
             # 记录到数据库
             if record_callback:
-                record_callback(sub_id, share_file_id, share_file_name, to_file_id, final_name, "done", "", actual_dest_size)
+                record_callback(sub_id, share_file_id, share_file_name, to_file_id, final_name, "done", "", actual_dest_size, ep)
 
             log.info(f"  ✅ 转存成功: {final_name}")
             result_item = {
@@ -309,7 +316,7 @@ class TransferEngine:
             error_msg = str(e)
             log.error(f"  ❌ 转存失败: {error_msg}")
             if record_callback:
-                record_callback(sub_id, share_file_id, share_file_name, "", "", "failed", error_msg, 0)
+                record_callback(sub_id, share_file_id, share_file_name, "", "", "failed", error_msg, 0, ep)
             return None
 
     def _verify_and_rename(self, file_id: str, expected_name: str, retries: int = 3) -> str:
@@ -428,6 +435,21 @@ class TransferEngine:
             conn = sqlite3.connect(db_path)
             rows = conn.execute(
                 "SELECT share_file_id FROM records WHERE subscribe_id=? AND status='done'",
+                (sub_id,)
+            ).fetchall()
+            conn.close()
+            return {r[0] for r in rows}
+        except:
+            return set()
+
+    def _get_existing_episodes(self, sub_id: int) -> set:
+        """从数据库获取已转存的集数集合（分享源重新上传时 share_file_id 会变，但集数不变）"""
+        import sqlite3
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
+        try:
+            conn = sqlite3.connect(db_path)
+            rows = conn.execute(
+                "SELECT episode_num FROM records WHERE subscribe_id=? AND status='done' AND episode_num > 0",
                 (sub_id,)
             ).fetchall()
             conn.close()
