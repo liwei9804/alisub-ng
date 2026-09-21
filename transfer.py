@@ -384,13 +384,13 @@ class TransferEngine:
         return deleted
 
     def _has_transferred_before(self, sub_id: int, share_file_id: str) -> bool:
-        """检查某文件是否已成功转存过（从 alisub-ng 自身 records 表查询）"""
+        """检查某文件是否已成功转存过（从 alisub-ng 自身 ali_record 表查询）"""
         import sqlite3
-        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "alisub-ng.db"))
         try:
             conn = sqlite3.connect(db_path)
             row = conn.execute(
-                "SELECT COUNT(*) FROM records WHERE subscribe_id=? AND share_file_id=? AND status='done'",
+                "SELECT COUNT(*) FROM ali_record WHERE subscribe_id=? AND share_file_id=? AND status='done'",
                 (sub_id, share_file_id)
             ).fetchone()
             conn.close()
@@ -430,11 +430,12 @@ class TransferEngine:
     def _get_existing_share_ids(self, sub_id: int) -> set:
         """从 alisub-ng 自身数据库获取已转存的 share_file_id 集合"""
         import sqlite3
-        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
+        import re
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "alisub-ng.db"))
         try:
             conn = sqlite3.connect(db_path)
             rows = conn.execute(
-                "SELECT share_file_id FROM records WHERE subscribe_id=? AND status='done'",
+                "SELECT share_file_id FROM ali_record WHERE subscribe_id=? AND status='done'",
                 (sub_id,)
             ).fetchall()
             conn.close()
@@ -443,16 +444,22 @@ class TransferEngine:
             return set()
 
     def _get_existing_episodes(self, sub_id: int) -> set:
-        """从数据库获取已转存的集数集合（分享源重新上传时 share_file_id 会变，但集数不变）"""
+        """从数据库获取已转存的集数集合（从 to_file_name 提取，ali_record 无 episode_num 列）"""
         import sqlite3
-        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
+        import re
+        db_path = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "alisub-ng.db"))
         try:
             conn = sqlite3.connect(db_path)
             rows = conn.execute(
-                "SELECT episode_num FROM records WHERE subscribe_id=? AND status='done' AND episode_num > 0",
+                "SELECT to_file_name FROM ali_record WHERE subscribe_id=? AND status='done'",
                 (sub_id,)
             ).fetchall()
             conn.close()
-            return {r[0] for r in rows}
+            episodes = set()
+            for r in rows:
+                m = re.search(r'S\d+E(\d+)', r[0])
+                if m:
+                    episodes.add(int(m.group(1)))
+            return episodes
         except:
             return set()

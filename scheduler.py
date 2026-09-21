@@ -19,7 +19,7 @@ from notifier import Notifier
 
 log = logging.getLogger("alisub-ng.scheduler")
 
-ALISUB_DB = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "data.db"))
+ALISUB_DB = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "alisub-ng.db"))
 
 
 class Scheduler:
@@ -252,23 +252,24 @@ class Scheduler:
         try:
             conn = sqlite3.connect(ALISUB_DB)
             # 确保 records 表存在（兼容旧库）
-            conn.execute("""CREATE TABLE IF NOT EXISTS records (
+            conn.execute("""CREATE TABLE IF NOT EXISTS ali_record (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 subscribe_id INTEGER NOT NULL,
                 share_file_id TEXT NOT NULL,
                 share_file_name TEXT NOT NULL,
                 to_file_id TEXT DEFAULT '',
                 to_file_name TEXT DEFAULT '',
-                episode_num INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'pending',
+                to_file_size INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'done',
                 error_msg TEXT DEFAULT '',
-                created_at TEXT DEFAULT (datetime('now'))
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
             )""")
             conn.execute("""
-                INSERT INTO records (subscribe_id, share_file_id, share_file_name,
-                                    to_file_id, to_file_name, episode_num, status, error_msg)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, episode_num, status, error))
+                INSERT INTO ali_record (subscribe_id, share_file_id, share_file_name,
+                                    to_file_id, to_file_name, status, error_msg)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (sub_id, share_file_id, share_file_name, to_file_id, to_file_name, status, error))
             conn.commit()
             conn.close()
         except Exception as e:
