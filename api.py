@@ -36,7 +36,10 @@ class AliyunDriveAPI:
         self.session.headers.update({
             "Content-Type": "application/json",
         })
-        self._ensure_token()
+        if self.refresh_token:
+            self._ensure_token()
+        else:
+            log.warning("⚠️ 未配置 refresh_token，等待 Web UI 配置")
 
     def _ensure_token(self):
         """确保 access_token 有效"""
@@ -61,8 +64,9 @@ class AliyunDriveAPI:
         log.info(f"✅ Token 刷新成功, drive_id={self.drive_id}")
 
     def _headers(self):
-        self._ensure_token()
-        return {"Authorization": f"Bearer {self.access_token}"}
+        if self.refresh_token:
+            self._ensure_token()
+        return {"Authorization": f"Bearer {self.access_token}"} if self.access_token else {}
 
     def _api(self, method: str, path: str, **kwargs) -> dict:
         """通用 API 调用"""

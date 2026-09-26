@@ -60,11 +60,14 @@ def load_settings():
 
 
 def save_settings(data):
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 
 app = Flask(__name__, template_folder="templates")
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_env.auto_reload = True
 app.secret_key = os.environ.get("SECRET_KEY", "alisub-ng-secret-key-change-me")
 
 # 默认账号密码
@@ -447,6 +450,17 @@ def api_save_settings():
         current["openlist_token"] = data["openlist_token"]
     if "openlist_storage_id" in data:
         current["openlist_storage_id"] = int(data["openlist_storage_id"])
+    # 整理设置
+    if "organize_dir_id" in data:
+        current["organize_dir_id"] = data["organize_dir_id"]
+    if "organize_output" in data:
+        current["organize_output"] = data["organize_output"]
+    if "tmdb_api_key" in data:
+        current["tmdb_api_key"] = data["tmdb_api_key"]
+    if "auto_organize" in data:
+        current["auto_organize"] = data["auto_organize"]
+    if "auto_organize_interval" in data:
+        current["auto_organize_interval"] = data["auto_organize_interval"]
     # drive_id 为空时，不自动填充（阿里云盘 API 不返回资源盘 ID，需用户手动选择）
     # 只在 token 无效时做校验
     save_settings(current)
@@ -803,6 +817,203 @@ def api_qrcode_query():
     except Exception as e:
         return jsonify({"code": -1, "msg": str(e)})
 
+
+
+
+# ─── 影视整理 ──────────────────────────────────────────
+
+from organizer import scan_directory as _scan_directory, match_files as _match_files, generate_plan, execute_plan
+from tmdb_matcher import set_api_key as _set_tmdb_key
+
+# ─── 整理日志缓冲 ────────────────────────────────────
+import collections
+_organize_log_buffer = collections.deque(maxlen=200)
+
+def _ol(msg, color='#d4d4d4'):
+    """添加整理日志"""
+    _organize_log_buffer.append({'msg': msg, 'color': color})
+
+import organizer as _organizer_mod
+_organizer_mod._ol = _ol
+
+def _get_organize_dir_id():
+    """获取"待整理"目录的 file_id，不存在则创建"""
+    api = get_api()
+    if not api:
+        return None
+    settings = load_settings()
+    drive_id = settings.get("drive_id", "")
+    if not drive_id:
+        return None
+    # 查找根目录下的"待整理"文件夹
+    children = api.list_files("root")
+    for child in children:
+        if child.get("name") == "待整理" and child.get("type") == "folder":
+            return child["file_id"]
+    # 不存在就创建
+    try:
+        result = api.create_folder("root", "待整理")
+        return result.get("file_id", "")
+    except Exception as e:
+        log.error(f"创建待整理目录失败: {e}")
+        return None
+
+
+@app.route("/api/organize/settings")
+@login_required
+def api_organize_get_settings():
+    s = load_settings()
+    return jsonify({"code": 0, "data": {
+        "organize_dir_id": s.get("organize_dir_id", ""),
+        "organize_output": s.get("organize_output", ""),
+        "tmdb_api_key": s.get("tmdb_api_key", ""),
+        "auto_organize": s.get("auto_organize", "0"),
+        "auto_organize_interval": s.get("auto_organize_interval", "60"),
+    }})
+
+
+@app.route("/api/organize/settings", methods=["POST"])
+@login_required
+def api_organize_save_settings():
+    data = request.json or {}
+    current = load_settings()
+    for key in ["organize_dir_id", "organize_output", "tmdb_api_key", "auto_organize", "auto_organize_interval"]:
+        if key in data:
+            current[key] = data[key]
+    save_settings(current)
+    return jsonify({"code": 0, "msg": "整理设置已保存"})
+
+
+@app.route("/api/organize/scan")
+@login_required
+def api_organize_scan():
+    """扫描待整理目录"""
+    dir_id = request.args.get("dir_id") or _get_organize_dir_id()
+    if not dir_id:
+        return jsonify({"code": -1, "msg": "请先配置云盘 Token 和 Drive ID"})
+    api = get_api()
+    if not api:
+        return jsonify({"code": -1, "msg": "API 未初始化"})
+    try:
+        files = _scan_directory(api, dir_id)
+        return jsonify({"code": 0, "data": files, "dir_id": dir_id})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+@app.route("/api/organize/match", methods=["POST"])
+@login_required
+def api_organize_match():
+    """匹配文件"""
+    data = request.json or {}
+    files = data.get("files", [])
+    tmdb_key = data.get("tmdb_key", "")
+    if tmdb_key:
+        _set_tmdb_key(tmdb_key)
+    settings = load_settings()
+    if not tmdb_key:
+        tmdb_key = settings.get("tmdb_key", "")
+        if tmdb_key:
+            _set_tmdb_key(tmdb_key)
+    try:
+        results = _match_files(files)
+        return jsonify({"code": 0, "data": results})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+@app.route("/api/organize/preview", methods=["POST"])
+@login_required
+def api_organize_preview():
+    """预览整理方案"""
+    data = request.json or {}
+    matches = data.get("matches", [])
+    output = data.get("output", "")
+    try:
+        plan = generate_plan(matches)
+        return jsonify({"code": 0, "data": plan})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+@app.route("/api/organize/execute", methods=["POST"])
+@login_required
+def api_organize_execute():
+    """执行整理"""
+    data = request.json or {}
+    plan = data.get("plan", [])
+    base_id = data.get("base_id", "root")
+    # 如果用户设定了输出目录，用它作为 base_id
+    s = load_settings()
+    if s.get("organize_output"):
+        base_id = s["organize_output"]
+    api = get_api()
+    if not api:
+        return jsonify({"code": -1, "msg": "API 未初始化"})
+    try:
+        results = execute_plan(api, plan, base_id)
+        return jsonify({"code": 0, "data": results})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+
+
+@app.route("/api/organize/logs")
+@login_required
+def api_organize_logs():
+    """获取整理日志"""
+    logs = list(_organize_log_buffer)
+    _organize_log_buffer.clear()
+    return jsonify({"code": 0, "data": logs})
+
+
+@app.route("/api/organize/cleanup", methods=["POST"])
+@login_required
+def api_organize_cleanup():
+    """整理完成后删除源目录中的文件夹"""
+    data = request.json or {}
+    folder_names = data.get("folder_names", [])
+    api = get_api()
+    if not api:
+        return jsonify({"code": -1, "msg": "API 未初始化"})
+    s = load_settings()
+    src_dir = s.get("organize_dir_id", "")
+    if not src_dir:
+        return jsonify({"code": -1, "msg": "未设置源目录"})
+    deleted = []
+    try:
+        # 找到源目录下的动漫子目录
+        src_files = api.list_files(src_dir)
+        for sf in src_files:
+            if sf.get("type") == "folder" and sf.get("name") == "动漫":
+                anime_id = sf["file_id"]
+                anime_files = api.list_files(anime_id)
+                for af in anime_files:
+                    if af.get("type") == "folder" and af.get("name") in folder_names:
+                        try:
+                            api.delete_file(af["file_id"])
+                            deleted.append(af["name"])
+                            _ol(f"🗑️ 删除源文件夹: {af['name']}", '#faad14')
+                        except Exception as e:
+                            _ol(f"⚠️ 删除失败: {af['name']} - {e}", '#ff4d4f')
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
+    return jsonify({"code": 0, "data": deleted})
+
+
+@app.route("/api/organize/dirs")
+@login_required
+def api_organize_dirs():
+    """列出子文件夹"""
+    parent_id = request.args.get("parent_id", "root")
+    api = get_api()
+    if not api:
+        return jsonify({"code": -1, "msg": "API 未初始化"})
+    try:
+        files = api.list_files(parent_id)
+        dirs = [{"file_id": f["file_id"], "name": f["name"]} for f in files if f.get("type") == "folder"]
+        return jsonify({"code": 0, "data": dirs})
+    except Exception as e:
+        return jsonify({"code": -1, "msg": str(e)})
 
 if __name__ == "__main__":
     models.init_db()

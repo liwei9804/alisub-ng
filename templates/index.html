@@ -81,7 +81,7 @@ tr:hover{background:#f9f9ff}
 
 <div class="tabs">
   <a href="#" class="active" onclick="switchTab(event,'tab-subs')">📋 订阅管理</a>
-  <a href="#" onclick="switchTab(event,'tab-browser')">📂 文件浏览</a>
+  <a href="#" onclick="switchTab(event,'tab-organize')">🎬 影视整理</a>
   <a href="#" onclick="switchTab(event,'tab-cleanup')">🗑️ 去重清理</a>
   <a href="#" onclick="switchTab(event,'tab-settings')">⚙️ 云盘设置</a>
 </div>
@@ -115,12 +115,47 @@ tr:hover{background:#f9f9ff}
     </div>
   </div>
 
-  <!-- 文件浏览器 -->
-  <div id="tab-browser" class="tab-content">
+  <!-- 影视整理 -->
+  <div id="tab-organize" class="tab-content">
     <div class="card">
-      <div class="card-title">📂 阿里云盘文件浏览器</div>
-      <div class="breadcrumb" id="breadcrumb"><a href="#" onclick="browseFiles('root')">根目录</a></div>
-      <div class="file-list" id="fileList"><div class="empty">点击加载...</div></div>
+      <div class="card-title">🎬 影视整理</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px;color:#666;white-space:nowrap">源目录：</label>
+        <input id="organizeDirId" type="text" placeholder="目录 ID（留空自动使用「待整理」）" style="flex:1;padding:6px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;min-width:240px">
+        <button class="btn btn-sm" onclick="openOrgPicker('organizeDirId')" style="background:#f0f0f0">📂 浏览</button>
+        <button class="btn btn-primary btn-sm" onclick="organizeScan()">🔍 扫描</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px;color:#666;white-space:nowrap">输出目录：</label>
+        <input id="organizeOutput" type="text" placeholder="输出目录 ID（留空则整理到根目录下）" style="flex:1;padding:6px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;min-width:240px">
+        <button class="btn btn-sm" onclick="openOrgPicker('organizeOutput')" style="background:#f0f0f0">📂 浏览</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px;color:#666;white-space:nowrap">TMDB Key：</label>
+        <input id="tmdbKeyInput" type="password" placeholder="TMDB API Key" style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;min-width:240px;flex:1;max-width:400px">
+        <button class="btn btn-sm" onclick="saveOrganizeSettings()" style="background:#faad14;color:#fff">💾 保存设置</button>
+        <button class="btn btn-primary btn-sm" onclick="organizeMatch()" id="btnMatch" disabled>🎯 匹配</button>
+        <button class="btn btn-sm" style="background:#52c41a;color:#fff" onclick="organizeExecute()" id="btnExecute" disabled>🚀 执行整理</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:13px;color:#666;white-space:nowrap">⏰ 定时整理：</label>
+        <label class="switch" style="display:inline-flex;align-items:center;cursor:pointer;user-select:none">
+          <input type="checkbox" id="autoOrganizeToggle" onchange="toggleAutoOrganize()" style="width:16px;height:16px;margin-right:4px">
+          <span style="font-size:13px" id="autoOrganizeLabel">关闭</span>
+        </label>
+        <label style="font-size:13px;color:#666;white-space:nowrap;margin-left:12px">间隔：</label>
+        <input id="autoOrganizeInterval" type="number" min="1" max="720" value="1" style="width:70px;padding:6px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;text-align:center">
+        <span style="font-size:13px;color:#666">小时</span>
+        <span id="autoOrganizeStatus" style="font-size:12px;color:#999;margin-left:8px"></span>
+      </div>
+      <div id="organizeProgress" style="display:none;margin-bottom:12px;padding:8px 12px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;font-size:13px"></div>
+      <div id="organizeResult"><div class="empty">设置源目录后点击「扫描」开始</div></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">📝 实时日志 <button class="btn btn-sm" onclick="clearOrganizeLogs()" style="margin-left:auto;background:#f0f0f0">清空</button></div>
+      <div id="organizeLogs" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-family:Consolas,Monaco,monospace;font-size:12px;max-height:400px;overflow-y:auto;line-height:1.6;white-space:pre-wrap;word-break:break-all">
+<span style="color:#666">等待操作...</span>
+</div>
     </div>
   </div>
 
@@ -346,7 +381,7 @@ function formatDays(str){
   return str.split(',').map(function(s){return names[parseInt(s.trim())]||s;}).join('、');
 }
 initDayCheckboxes();
-function switchTab(e,name){ document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');}); document.querySelectorAll('.tabs a').forEach(function(a){a.classList.remove('active');}); document.getElementById(name).classList.add('active'); e.target.classList.add('active'); if(name==='tab-browser') browseFiles('root'); }
+function switchTab(e,name){ document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');}); document.querySelectorAll('.tabs a').forEach(function(a){a.classList.remove('active');}); document.getElementById(name).classList.add('active'); if(e&&e.target){var el=e.target.closest('a');if(el)el.classList.add('active');} }
 
 // ─── 订阅管理 ──────────────────────────────────────
 function loadSubs(){
@@ -498,36 +533,326 @@ function dryRunCleanup(){
   });
 }
 
-// ─── 文件浏览器 ──────────────────────────────────────
-var browsePath=[{id:'root',name:'根目录'}];
-function browseFiles(parentId,name){
-  if(parentId==='root') browsePath=[{id:'root',name:'根目录'}];
-  else if(name) browsePath.push({id:parentId,name:name});
-  renderBreadcrumb();
-  document.getElementById('fileList').innerHTML='<div class="empty">加载中...</div>';
-  fetch('/api/files?parent_file_id='+parentId).then(function(r){return r.json();}).then(function(d){
-    if(d.code!==0||!d.data||!d.data.length){ document.getElementById('fileList').innerHTML='<div class="empty">'+(d.msg||'空目录')+'</div>'; return; }
-    var html='';
+// ─── 影视整理 ──────────────────────────────────────
+var organizeFiles=[];
+var organizeMatches=[];
+var organizePlan=[];
+var organizeLogTimer=null;
+var organizePage=0;
+var organizePageSize=10;
+var organizeSourceFolders={}; // folder_name → folder_id, used for cleanup after execute
+var autoOrganizeTimer=null;
+
+function addOrganizeLog(msg, color){
+  var el=document.getElementById('organizeLogs');
+  var t=new Date().toLocaleTimeString('zh-CN');
+  var c=color||'#d4d4d4';
+  // 移除“等待操作...”占位
+  if(el.children.length===1&&el.children[0].style.color==='#666') el.innerHTML='';
+  el.innerHTML+='<span style="color:#888">['+t+']</span> <span style="color:'+c+'">'+esc(msg)+'</span>\n';
+  el.scrollTop=el.scrollHeight;
+}
+function clearOrganizeLogs(){
+  document.getElementById('organizeLogs').innerHTML='<span style="color:#666">等待操作...</span>\n';
+}
+
+function getOrganizeDirId(){
+  return document.getElementById('organizeDirId').value.trim();
+}
+
+function getOrganizeOutputDir(){
+  return document.getElementById('organizeOutput').value.trim();
+}
+
+// ─── 扫描 ──────────────────────────────────────
+function organizeScan(){
+  var el=document.getElementById('organizeResult');
+  var dirId=getOrganizeDirId();
+  var url='/api/organize/scan'+(dirId?'?dir_id='+dirId:'');
+  el.innerHTML='<div class="empty">扫描中...</div>';
+  document.getElementById('btnMatch').disabled=true;
+  document.getElementById('btnExecute').disabled=true;
+  addOrganizeLog('开始扫描...'+(dirId?' 目录: '+dirId:' 使用默认「待整理」目录'),'#1890ff');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0){el.innerHTML='<div class="empty">'+esc(d.msg||'扫描失败')+'</div>';addOrganizeLog('扫描失败: '+d.msg,'#ff4d4f');return;}
+    if(!d.data||!d.data.length){el.innerHTML='<div class="empty">没有找到视频文件</div>';addOrganizeLog('扫描完成，没有找到视频文件','#faad14');return;}
+    organizeFiles=d.data;
+    organizePage=0;
+    // 收集源文件夹信息（用于整理后清理）
+    organizeSourceFolders={};
     d.data.forEach(function(f){
-      var isFolder=f.type==='folder';
-      var icon=isFolder?'📁':'📄';
-      var ext=(f.name||'').split('.').pop().toLowerCase();
-      if(['mp4','mkv'].includes(ext)) icon='🎬';
-      var size=isFolder?'':fmtSize(f.size||0);
-      var onclick=isFolder?' onclick="browseFiles(\''+f.file_id+'\',\''+esc(f.name)+'\')"' : '';
-      html+='<div class="file-item"'+onclick+'><span class="icon">'+icon+'</span><span class="name">'+esc(f.name)+'</span><span class="size">'+size+'</span></div>';
+      if(f.folder_name&&!organizeSourceFolders[f.folder_name]) organizeSourceFolders[f.folder_name]='';
     });
-    document.getElementById('fileList').innerHTML=html;
+    addOrganizeLog('扫描完成，找到 '+d.data.length+' 个视频文件','#52c41a');
+    renderScanFiles();
+    document.getElementById('btnMatch').disabled=false;
+    document.getElementById('btnMatch').textContent='🎯 匹配TMDB ('+d.data.length+'个文件)';
+  }).catch(function(e){
+    el.innerHTML='<div class="empty">扫描失败: '+esc(e.message)+'</div>';
+    addOrganizeLog('扫描失败: '+e.message,'#ff4d4f');
   });
 }
 
-function renderBreadcrumb(){
-  var html='';
-  browsePath.forEach(function(p,i){
-    if(i>0) html+='<span>/</span>';
-    html+='<a href="#" onclick="browseFiles(\''+p.id+'\')">'+esc(p.name)+'</a>';
+// ─── 分页渲染扫描结果 ──────────────────────────────
+function renderScanFiles(){
+  var el=document.getElementById('organizeResult');
+  var total=organizeFiles.length;
+  var totalPages=Math.ceil(total/organizePageSize);
+  if(organizePage>=totalPages)organizePage=totalPages-1;
+  if(organizePage<0)organizePage=0;
+  var start=organizePage*organizePageSize;
+  var end=Math.min(start+organizePageSize,total);
+  var pageFiles=organizeFiles.slice(start,end);
+  var html='<table><thead><tr><th>#</th><th>文件夹</th><th>文件名</th><th>大小</th></tr></thead><tbody>';
+  pageFiles.forEach(function(f,i){
+    var sz=f.size?(f.size/1073741824).toFixed(2)+' GB':'-';
+    html+='<tr><td>'+(start+i+1)+'</td><td>'+esc(f.folder_name||'-')+'</td><td>'+esc(f.name)+'</td><td>'+sz+'</td></tr>';
   });
-  document.getElementById('breadcrumb').innerHTML=html;
+  html+='</tbody></table>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 0">';
+  html+='<span style="color:#888;font-size:13px">共 '+total+' 个文件，第 '+(organizePage+1)+'/'+totalPages+' 页</span>';
+  html+='<div>';
+  if(organizePage>0) html+='<button class="btn btn-sm" onclick="organizePage--;renderScanFiles()" style="margin-right:8px">⬅ 上一页</button>';
+  if(organizePage<totalPages-1) html+='<button class="btn btn-sm" onclick="organizePage++;renderScanFiles()">下一页 ➡</button>';
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+// ─── 匹配 ──────────────────────────────────────
+function organizeMatch(){
+  var el=document.getElementById('organizeResult');
+  var prog=document.getElementById('organizeProgress');
+  var tmdbKey=document.getElementById('tmdbKeyInput').value;
+  if(!tmdbKey){alert('请填写 TMDB API Key');return;}
+  prog.style.display='block';
+  prog.textContent='正在匹配... 0/'+organizeFiles.length;
+  document.getElementById('btnMatch').disabled=true;
+  addOrganizeLog('开始 TMDB 匹配，共 '+organizeFiles.length+' 个文件...','#1890ff');
+  // 启动日志轮询
+  startLogPolling();
+  fetch('/api/organize/match',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({files:organizeFiles,tmdb_key:tmdbKey})
+  }).then(function(r){return r.json();}).then(function(d){
+    stopLogPolling();
+    prog.style.display='none';
+    document.getElementById('btnMatch').disabled=false;
+    if(d.code!==0){el.innerHTML='<div class="empty">'+esc(d.msg||'匹配失败')+'</div>';addOrganizeLog('匹配失败: '+d.msg,'#ff4d4f');return;}
+    organizeMatches=d.data;
+    addOrganizeLog('TMDB 匹配完成','#52c41a');
+    renderMatchResults(d.data);
+    return fetch('/api/organize/preview',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({matches:d.data,output:getOrganizeOutputDir()})
+    });
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d)return;
+    organizePlan=d.data||[];
+    renderPlanPreview(organizePlan);
+    document.getElementById('btnExecute').disabled=false;
+    document.getElementById('btnExecute').textContent='🚀 执行整理 ('+organizePlan.filter(function(p){return p.action==='move';}).length+'个文件)';
+  }).catch(function(e){
+    stopLogPolling();
+    prog.style.display='none';
+    el.innerHTML='<div class="empty">匹配失败: '+esc(e.message)+'</div>';
+    addOrganizeLog('匹配失败: '+e.message,'#ff4d4f');
+  });
+}
+
+function renderMatchResults(matches){
+  // 先显示匹配结果，等 plan 生成后再显示重命名
+  var html='<div class="empty">匹配完成，正在生成整理方案...</div>';
+  document.getElementById('organizeResult').innerHTML=html;
+}
+
+function renderPlanPreview(plan){
+  var prog=document.getElementById('organizeProgress');
+  var moveCount=plan.filter(function(p){return p.action==='move';}).length;
+  var skipCount=plan.filter(function(p){return p.action==='skip';}).length;
+  prog.style.display='block';
+  prog.innerHTML='📋 整理方案: <b>'+moveCount+'</b> 个文件将被整理，<b>'+skipCount+'</b> 个跳过';
+  addOrganizeLog('生成整理方案: '+moveCount+' 个移动, '+skipCount+' 个跳过','#1890ff');
+  // 用分页显示匹配+重命名结果
+  organizePage=0;
+  renderPlanPage();
+}
+
+function renderPlanPage(){
+  var el=document.getElementById('organizeResult');
+  var plan=organizePlan;
+  var total=plan.length;
+  var totalPages=Math.ceil(total/organizePageSize);
+  if(organizePage>=totalPages)organizePage=totalPages-1;
+  if(organizePage<0)organizePage=0;
+  var start=organizePage*organizePageSize;
+  var end=Math.min(start+organizePageSize,total);
+  var pageItems=plan.slice(start,end);
+  var html='<table><thead><tr><th>#</th><th>源文件名</th><th>→</th><th>整理后文件名</th><th>状态</th></tr></thead><tbody>';
+  pageItems.forEach(function(p,i){
+    var status='';
+    var color='';
+    if(p.action==='move'){
+      var match=p.match;
+      if(match){
+        var bg=match.category==='电影'?'#fff7e6':match.category==='动漫'?'#f0f5ff':'#f6ffed';
+        var fg=match.category==='电影'?'#fa8c16':match.category==='动漫'?'#1890ff':'#52c41a';
+        status='<span style="padding:2px 8px;border-radius:4px;font-size:12px;background:'+bg+';color:'+fg+'">'+match.category+'</span>';
+      } else {
+        status='<span style="color:#1890ff">整理</span>';
+      }
+    } else {
+      status='<span style="color:#999">跳过</span>';
+    }
+    var newName=p.target_name||p.name;
+    html+='<tr><td>'+(start+i+1)+'</td><td>'+esc(p.name)+'</td><td style="color:#888">→</td><td style="color:#52c41a">'+esc(newName)+'</td><td>'+status+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 0">';
+  html+='<span style="color:#888;font-size:13px">共 '+total+' 个文件，第 '+(organizePage+1)+'/'+totalPages+' 页</span>';
+  html+='<div>';
+  if(organizePage>0) html+='<button class="btn btn-sm" onclick="organizePage--;renderPlanPage()" style="margin-right:8px">⬅ 上一页</button>';
+  if(organizePage<totalPages-1) html+='<button class="btn btn-sm" onclick="organizePage++;renderPlanPage()">下一页 ➡</button>';
+  html+='</div></div>';
+  el.innerHTML=html;
+}
+
+// ─── 执行整理 ──────────────────────────────────────
+function organizeExecute(){
+  if(!organizePlan.length){alert('没有可执行的整理方案');return;}
+  var moveCount=organizePlan.filter(function(p){return p.action==='move';}).length;
+  if(!confirm('确认执行整理？将移动 '+moveCount+' 个文件')){return;}
+  var el=document.getElementById('organizeResult');
+  var prog=document.getElementById('organizeProgress');
+  prog.style.display='block';
+  prog.textContent='正在执行整理...';
+  document.getElementById('btnExecute').disabled=true;
+  addOrganizeLog('🚀 开始执行整理...','#52c41a');
+  startLogPolling();
+  fetch('/api/organize/execute',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({plan:organizePlan, base_id:getOrganizeOutputDir()})
+  }).then(function(r){return r.json();}).then(function(d){
+    stopLogPolling();
+    prog.style.display='none';
+    document.getElementById('btnExecute').disabled=false;
+    if(d.code!==0){el.innerHTML='<div class="empty">'+esc(d.msg||'执行失败')+'</div>';addOrganizeLog('执行失败: '+d.msg,'#ff4d4f');return;}
+    var ok=d.data.filter(function(r){return r.status==='ok';}).length;
+    var fail=d.data.filter(function(r){return r.status==='error';}).length;
+    addOrganizeLog('✅ 整理完成: 成功 '+ok+' 个, 失败 '+fail+' 个','#52c41a');
+    var html='<table><thead><tr><th>#</th><th>文件名</th><th>状态</th><th>目标</th></tr></thead><tbody>';
+    d.data.forEach(function(r,i){
+      var color=r.status==='ok'?'#52c41a':r.status==='skipped'?'#999':'#ff4d4f';
+      var label=r.status==='ok'?'✅ 成功':r.status==='skipped'?'⏭️ 跳过':'❌ 失败';
+      html+='<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td style="color:'+color+'">'+label+'</td><td>'+esc(r.target||r.reason||'-')+'</td></tr>';
+    });
+    html+='</tbody></table>';
+    el.innerHTML=html;
+    prog.innerHTML='✅ 整理完成！';
+    prog.style.display='block';
+    prog.style.background='#f6ffed';
+    // 整理成功后删除源文件夹
+    var folderNames=Object.keys(organizeSourceFolders);
+    if(folderNames.length&&ok>0){
+      addOrganizeLog('🗑️ 开始删除源文件夹...','#faad14');
+      fetch('/api/organize/cleanup',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({folder_names:folderNames})
+      }).then(function(r){return r.json();}).then(function(cd){
+        if(cd.code===0&&cd.data&&cd.data.length){
+          addOrganizeLog('🗑️ 已删除源文件夹: '+cd.data.join(', ') ,'#52c41a');
+        } else if(cd.code===0){
+          addOrganizeLog('🗑️ 没有需要删除的源文件夹','#999');
+        }
+      }).catch(function(){});
+    }
+  }).catch(function(e){
+    stopLogPolling();
+    prog.style.display='none';
+    document.getElementById('btnExecute').disabled=false;
+    el.innerHTML='<div class="empty">执行失败: '+esc(e.message)+'</div>';
+    addOrganizeLog('执行失败: '+e.message,'#ff4d4f');
+  });
+}
+
+// ─── 日志轮询 ──────────────────────────────────────
+function startLogPolling(){
+  stopLogPolling();
+  organizeLogTimer=setInterval(function(){
+    fetch('/api/organize/logs').then(function(r){return r.json();}).then(function(d){
+      if(d.code===0&&d.data){
+        d.data.forEach(function(line){addOrganizeLog(line.msg,line.color);});
+      }
+    }).catch(function(){});
+  },2000);
+}
+function stopLogPolling(){
+  if(organizeLogTimer){clearInterval(organizeLogTimer);organizeLogTimer=null;}
+}
+
+// ─── 定时整理 ──────────────────────────────────────
+function toggleAutoOrganize(){
+  var on=document.getElementById('autoOrganizeToggle').checked;
+  var label=document.getElementById('autoOrganizeLabel');
+  var status=document.getElementById('autoOrganizeStatus');
+  if(on){
+    var min=parseInt(document.getElementById('autoOrganizeInterval').value)||1;
+    if(min<1)min=1;
+    var ms=min*60*60*1000;
+    label.textContent='已开启';
+    label.style.color='#52c41a';
+    addOrganizeLog('⏰ 定时整理已开启，间隔 '+min+' 小时','#1890ff');
+    autoOrganizeTimer=setInterval(function(){runAutoOrganize();},ms);
+    status.textContent='下次执行: '+new Date(Date.now()+ms).toLocaleTimeString('zh-CN');
+  } else {
+    label.textContent='关闭';
+    label.style.color='';
+    status.textContent='';
+    if(autoOrganizeTimer){clearInterval(autoOrganizeTimer);autoOrganizeTimer=null;}
+    addOrganizeLog('⏰ 定时整理已关闭','#999');
+  }
+}
+function runAutoOrganize(){
+  var dirId=getOrganizeDirId();
+  var tmdbKey=document.getElementById('tmdbKeyInput').value;
+  if(!tmdbKey){addOrganizeLog('⏰ 定时整理跳过: 未设置 TMDB Key','#faad14');return;}
+  addOrganizeLog('⏰ 定时整理开始...','#1890ff');
+  var url='/api/organize/scan'+(dirId?'?dir_id='+dirId:'');
+  startLogPolling();
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(d.code!==0||!d.data||!d.data.length){
+      addOrganizeLog('⏰ 定时整理: 未找到视频文件','#faad14');
+      stopLogPolling();return;
+    }
+    organizeFiles=d.data;
+    addOrganizeLog('⏰ 扫描到 '+d.data.length+' 个文件','#d4d4d4');
+    return fetch('/api/organize/match',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({files:d.data,tmdb_key:tmdbKey})
+    });
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.code!==0)return;
+    organizeMatches=d.data;
+    addOrganizeLog('⏰ 匹配完成','#d4d4d4');
+    return fetch('/api/organize/preview',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({matches:d.data,output:getOrganizeOutputDir()})
+    });
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.code!==0)return;
+    organizePlan=d.data||[];
+    var moveCount=organizePlan.filter(function(p){return p.action==='move';}).length;
+    if(moveCount===0){
+      addOrganizeLog('⏰ 没有需要整理的文件','#999');
+      stopLogPolling();return;
+    }
+    addOrganizeLog('⏰ 开始执行整理，'+moveCount+' 个文件','#52c41a');
+    return fetch('/api/organize/execute',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({plan:organizePlan,base_id:getOrganizeOutputDir()})
+    });
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(d&&d.code===0){
+      var ok=d.data.filter(function(r){return r.status==='ok';}).length;
+      addOrganizeLog('⏰ 定时整理完成，成功 '+ok+' 个','#52c41a');
+    }
+    stopLogPolling();
+  }).catch(function(e){
+    addOrganizeLog('⏰ 定时整理失败: '+e.message,'#ff4d4f');
+    stopLogPolling();
+  });
 }
 
 // ─── 时钟 ──────────────────────────────────────
@@ -654,12 +979,15 @@ var origSwitchTab = switchTab;
 switchTab = function(e,name){
   origSwitchTab(e,name);
   if(name==='tab-settings') loadSettings();
+  if(name==='tab-organize') loadOrganizeSettings();
 };
 
 // ─── 目录选择器 ──────────────────────────────────────
 var dirPickerCurrentId = 'root';
+var dirPickerTargetId = 'editParentId'; // 默认填入订阅编辑的目标
 
-function openDirPicker(){
+function openDirPicker(targetInputId){
+  dirPickerTargetId = targetInputId || 'editParentId';
   dirPickerCurrentId = 'root';
   document.getElementById('dirPickerModal').classList.add('open');
   dirPickerBrowse('root');
@@ -693,9 +1021,44 @@ function dirPickerBrowse(parentFileId){
 }
 
 function selectCurrentDir(){
-  document.getElementById('editParentId').value = dirPickerCurrentId;
+  document.getElementById(dirPickerTargetId).value = dirPickerCurrentId;
   closeModal('dirPickerModal');
   showToast('✅ 已选择目录: '+dirPickerCurrentId,true);
+}
+
+// ─── 影视整理目录浏览（复用dirPickerModal）──────
+function openOrgPicker(targetInputId){
+  openDirPicker(targetInputId);
+}
+
+function saveOrganizeSettings(){
+  var data = {
+    organize_dir_id: document.getElementById('organizeDirId').value.trim(),
+    organize_output: document.getElementById('organizeOutput').value.trim(),
+    tmdb_api_key: document.getElementById('tmdbKeyInput').value.trim(),
+    auto_organize: document.getElementById('autoOrganizeToggle').checked ? '1' : '0',
+    auto_organize_interval: document.getElementById('autoOrganizeInterval').value,
+  };
+  fetch('/api/organize/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(function(r){return r.json();}).then(function(d){
+    if(d.code===0) showToast('✅ 整理设置已保存',true);
+    else showToast('❌ 保存失败: '+(d.msg||''),false);
+  }).catch(function(){showToast('❌ 网络错误',false);});
+}
+
+function loadOrganizeSettings(){
+  fetch('/api/organize/settings').then(function(r){return r.json();}).then(function(d){
+    if(d.code===0&&d.data){
+      if(d.data.organize_dir_id) document.getElementById('organizeDirId').value=d.data.organize_dir_id;
+      if(d.data.organize_output) document.getElementById('organizeOutput').value=d.data.organize_output;
+      if(d.data.tmdb_api_key) document.getElementById('tmdbKeyInput').value=d.data.tmdb_api_key;
+      // 先设间隔值，再开定时器
+      if(d.data.auto_organize_interval) document.getElementById('autoOrganizeInterval').value=d.data.auto_organize_interval;
+      if(d.data.auto_organize==='1'){
+        document.getElementById('autoOrganizeToggle').checked=true;
+        toggleAutoOrganize();
+      }
+    }
+  });
 }
 
 // ─── 分享文件选择器 ──────────────────────────────────────

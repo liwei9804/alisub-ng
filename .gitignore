@@ -4,3 +4,5 @@ data/
 logs/
 settings.json
 data.db
+venv/
+alisub-ng.db
